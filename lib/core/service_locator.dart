@@ -34,6 +34,8 @@ Future<void> init() async {
       addProductUseCase: sl(),
       updateProductUseCase: sl(),
       deleteProductUseCase: sl(),
+      exportProductsUseCase: sl(),
+      importProductsUseCase: sl(),
     ),
   );
 
@@ -56,6 +58,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateProductUseCase(sl()));
   sl.registerLazySingleton(() => DeleteProductUseCase(sl()));
   sl.registerLazySingleton(() => GetProductByBarcodeUseCase(sl()));
+  sl.registerLazySingleton(() => ExportProductsUseCase(sl()));
+  sl.registerLazySingleton(() => ImportProductsUseCase(sl()));
 
   // Repository
   sl.registerLazySingleton<ProductRepository>(
