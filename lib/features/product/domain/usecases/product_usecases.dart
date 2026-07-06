@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecase/usecase.dart';
+import '../entities/import_result.dart';
 import '../entities/product.dart';
 import '../repositories/product_repository.dart';
 
@@ -56,5 +57,31 @@ class GetProductByBarcodeUseCase implements UseCase<Product, String> {
   @override
   Future<Either<Failure, Product>> call(String params) {
     return repository.getProductByBarcode(params);
+  }
+}
+
+class ExportProductsUseCase implements UseCase<String, NoParams> {
+  final ProductRepository repository;
+
+  ExportProductsUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, String>> call(NoParams params) async {
+    final productsResult = await repository.getProducts();
+    return productsResult.fold(
+      (failure) => Left(failure),
+      (products) => repository.exportProductsToCsv(products),
+    );
+  }
+}
+
+class ImportProductsUseCase implements UseCase<ImportResult, String> {
+  final ProductRepository repository;
+
+  ImportProductsUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, ImportResult>> call(String params) {
+    return repository.importProductsFromCsv(params);
   }
 }

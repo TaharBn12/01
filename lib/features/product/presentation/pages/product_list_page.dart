@@ -1,6 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:billing_app/l10n/app_localizations.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
 import '../bloc/product_bloc.dart';
 import '../../domain/entities/product.dart';
@@ -34,6 +36,47 @@ class _ProductListPageState extends State<ProductListPage> {
     super.dispose();
   }
 
+  Future<void> _importProducts(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final file = result.files.first;
+      final Uint8List? bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Could not read selected file'),
+                backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      final csvContent = String.fromCharCodes(bytes);
+      if (!context.mounted) return;
+      context.read<ProductBloc>().add(
+            ImportProducts(csvContent: csvContent),
+          );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Import failed: ${e.toString()}'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _scanQR(List<Product> products) async {
     final barcode = await context.push<String>('/scanner');
     if (barcode != null && barcode.isNotEmpty) {
@@ -64,6 +107,23 @@ class _ProductListPageState extends State<ProductListPage> {
         title: Text(AppLocalizations.of(context)!.productManagement,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined,
+                color: AppTheme.primaryColor),
+            tooltip: 'Import Products',
+            onPressed: () => _importProducts(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined,
+                color: AppTheme.primaryColor),
+            tooltip: 'Export Products',
+            onPressed: () {
+              context.read<ProductBloc>().add(ExportProducts());
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [

@@ -29,3 +29,12 @@ class DeleteProduct extends ProductEvent {
   @override
   List<Object> get props => [id];
 }
+
+class ExportProducts extends ProductEvent {}
+
+class ImportProducts extends ProductEvent {
+  final String csvContent;
+  const ImportProducts({required this.csvContent});
+  @override
+  List<Object> get props => [csvContent];
+}
