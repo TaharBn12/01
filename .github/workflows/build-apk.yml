@@ -46,13 +46,13 @@ jobs:
           set -o pipefail
           flutter analyze 2>&1 | tee logs/analyze.log
 
-      - name: بناء APK (debug)
+      - name: بناء APK (debug — arm64 للهواتف الحديثة)
         id: build
         shell: bash
         continue-on-error: true
         run: |
           set -o pipefail
-          flutter build apk --debug 2>&1 | tee logs/build.log
+          flutter build apk --debug --target-platform android-arm64 2>&1 | tee logs/build.log
 
       - name: سجلّات في ملخص التشغيل
         if: always()
@@ -69,7 +69,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: رفع APK والسجلات
+      - name: رفع APK والسجلات (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -81,33 +81,39 @@ jobs:
             pubspec.lock
           retention-days: 14
 
-      - name: نشر الـ APK إلى فرع builds/apk
+      - name: نشر المخرجات إلى فرع builds/apk
         if: always()
         shell: bash
-        env:
-          PUSH_TOKEN: ${{ github.event.inputs.push_token }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          AUTH_TOKEN="${PUSH_TOKEN:-$GH_TOKEN}"
-          # إخفاء الرمز من السجلات
-          echo "::add-mask::${AUTH_TOKEN}"
-          set -x
-          rm -rf /tmp/dist && mkdir -p /tmp/dist/logs
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # تجميع المخرجات قبل الانتقال للفرع اليتيم
+          mkdir -p /tmp/dist/logs /tmp/dist/parts
           cp logs/*.log /tmp/dist/logs/ 2>/dev/null || true
-          cp pubspec.lock /tmp/dist/ 2>/dev/null || true
-          APK="$(ls build/app/outputs/flutter-apk/app-debug.apk 2>/dev/null || true)"
-          if [ -n "$APK" ]; then
-            cp "$APK" /tmp/dist/watch-together-debug.apk
-            ls -lh /tmp/dist/watch-together-debug.apk
+          [ -f pubspec.lock ] && cp pubspec.lock /tmp/dist/ || true
+
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          if [ -f "$APK" ]; then
+            SIZE_MB=$(du -m "$APK" | cut -f1)
+            echo "APK size: ${SIZE_MB} MB"
+            if [ "$SIZE_MB" -lt 45 ]; then
+              cp "$APK" /tmp/dist/watch-together-debug-arm64.apk
+            else
+              # تقسيم لأجزاء 40MB لاحترام حدّ GitHub للملفات
+              split -b 40m -d -a 2 "$APK" /tmp/dist/parts/watch-together.apk.part-
+              (cd /tmp/dist/parts && sha256sum watch-together.apk.part-* > SHA256SUMS)
+            fi
           else
             echo "BUILD_MISSING" > /tmp/dist/BUILD_MISSING.txt
           fi
-          cd /tmp/dist
-          git init -q
-          git checkout -q --orphan apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git -c commit.gpgsign=false commit -q -m "apk build ${{ github.run_id }}"
-          git remote add origin "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git"
-          git push -f origin apk:refs/heads/builds/apk
+
+          # فرع يتيم يحتوي المخرجات فقط
+          git checkout --orphan builds-apk
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          find . -maxdepth 1 -mindepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -r /tmp/dist ./dist
+          git add dist
+          git -c commit.gpgsign=false commit -m "apk build ${{ github.run_id }}"
+          git push -f origin HEAD:refs/heads/builds/apk
