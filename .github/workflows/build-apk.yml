@@ -56,3 +56,30 @@ jobs:
             logs/*.log
             pubspec.lock
           retention-days: 14
+
+      - name: نشر الـ APK إلى فرع builds/apk
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          rm -rf /tmp/dist && mkdir -p /tmp/dist/logs
+          cp logs/*.log /tmp/dist/logs/ 2>/dev/null || true
+          cp pubspec.lock /tmp/dist/ 2>/dev/null || true
+          APK="$(ls build/app/outputs/flutter-apk/app-debug.apk 2>/dev/null || true)"
+          if [ -n "$APK" ]; then
+            cp "$APK" /tmp/dist/watch-together-debug.apk
+            ls -lh /tmp/dist/watch-together-debug.apk
+          else
+            echo "BUILD_MISSING" > /tmp/dist/BUILD_MISSING.txt
+          fi
+          cd /tmp/dist
+          git init -q
+          git checkout -q --orphan apk
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git add -A
+          git -c commit.gpgsign=false commit -q -m "apk build ${{ github.run_id }}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push -f --force origin apk:refs/heads/builds/apk
