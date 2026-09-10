@@ -2,6 +2,11 @@ name: Build APK
 
 on:
   workflow_dispatch:
+    inputs:
+      push_token:
+        description: "رمز مؤقت لدفع مخرجات البناء (اختياري)"
+        required: false
+        type: string
   push:
     branches: [arena/**]
 
@@ -80,8 +85,12 @@ jobs:
         if: always()
         shell: bash
         env:
+          PUSH_TOKEN: ${{ github.event.inputs.push_token }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          AUTH_TOKEN="${PUSH_TOKEN:-$GH_TOKEN}"
+          # إخفاء الرمز من السجلات
+          echo "::add-mask::${AUTH_TOKEN}"
           set -x
           rm -rf /tmp/dist && mkdir -p /tmp/dist/logs
           cp logs/*.log /tmp/dist/logs/ 2>/dev/null || true
@@ -100,5 +109,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git -c commit.gpgsign=false commit -q -m "apk build ${{ github.run_id }}"
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git"
           git push -f origin apk:refs/heads/builds/apk
