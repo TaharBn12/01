@@ -2,20 +2,20 @@ name: Build APK
 
 on:
   workflow_dispatch:
-    inputs:
-      push_token:
-        description: "رمز مؤقت لدفع مخرجات البناء (اختياري)"
-        required: false
-        type: string
   push:
     branches: [arena/**]
 
 permissions:
   contents: write
 
+# لا بنيتان متزامنتان: آخر تعديل فقط هو المُنشَر
+concurrency:
+  group: apk-release
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: بناء ملف APK
+    name: بناء ونشر APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,74 +46,99 @@ jobs:
           set -o pipefail
           flutter analyze 2>&1 | tee logs/analyze.log
 
-      - name: بناء APK (release — arm64 للهواتف الحديثة)
+      - name: بناء APK (release — لكل المعماريات universal)
         id: build
         shell: bash
-        continue-on-error: true
         run: |
           set -o pipefail
-          flutter build apk --release --target-platform android-arm64 2>&1 | tee logs/build.log
+          flutter build apk --release 2>&1 | tee logs/build.log
+          cp build/app/outputs/flutter-apk/app-release.apk sinema-jamaiya.apk
+          ls -lh sinema-jamaiya.apk
 
       - name: سجلّات في ملخص التشغيل
         if: always()
         shell: bash
         run: |
           {
-            echo "## analyze (آخر 80 سطرًا)"
+            echo "## رابط التحميل الدائم"
+            echo "https://github.com/${{ github.repository }}/releases/download/latest/sinema-jamaiya.apk"
+            echo ""
+            echo "## analyze (آخر 60 سطرًا)"
             echo '```'
-            tail -n 80 logs/analyze.log || true
+            tail -n 60 logs/analyze.log || true
             echo '```'
-            echo "## build (آخر 120 سطرًا)"
+            echo "## build (آخر 80 سطرًا)"
             echo '```'
-            tail -n 120 logs/build.log || true
+            tail -n 80 logs/build.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: رفع APK والسجلات (artifact)
+      - name: رفع APK والسجلات (artifact احتياطي)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: watch-together-apk
+          name: sinema-jamaiya-apk
           if-no-files-found: ignore
           path: |
-            build/app/outputs/flutter-apk/*.apk
+            sinema-jamaiya.apk
             logs/*.log
             pubspec.lock
-          retention-days: 14
+          retention-days: 30
 
-      - name: نشر المخرجات إلى فرع builds/apk
+      - name: نشر إصدار دائم (رابط ثابت يُحدَّث مع كل تعديل)
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          TAG="latest"
+          NOTES=$(cat <<'MD'
+          # سينما جماعية — أحدث نسخة APK
+
+          هذا الإصدار يُحدَّث **تلقائيًّا** مع كل تعديل في الكود.
+
+          ## رابط التحميل المباشر الدائم
+          https://github.com/TaharBn12/01/releases/download/latest/sinema-jamaiya.apk
+
+          - النوع: release universal (يعمل على كل هواتف أندرويد arm/arm64/x86_64)
+          - ثبّت الملف بعد السماح بالتثبيت من مصادر غير معروفة.
+          MD
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "أحدث نسخة (محدّثة تلقائيًّا)" --notes "$NOTES" --target "${{ github.ref_name }}"
+          else
+            gh release create "$TAG" --target "${{ github.ref_name }}" \
+              --title "أحدث نسخة (محدّثة تلقائيًّا)" --notes "$NOTES"
+          fi
+          # --clobber يستبدل الملف القديم بنفس الاسم فيُحدَّث الرابط الدائم
+          gh release upload "$TAG" sinema-jamaiya.apk --clobber
+          echo "✅ الرابط الدائم:"
+          echo "https://github.com/${{ github.repository }}/releases/download/latest/sinema-jamaiya.apk"
+
+      - name: نسخة احتياطية إلى فرع builds/apk
         if: always()
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # تجميع المخرجات قبل الانتقال للفرع اليتيم
           mkdir -p /tmp/dist/logs /tmp/dist/parts
           cp logs/*.log /tmp/dist/logs/ 2>/dev/null || true
           [ -f pubspec.lock ] && cp pubspec.lock /tmp/dist/ || true
-
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          if [ -f "$APK" ]; then
-            SIZE_MB=$(du -m "$APK" | cut -f1)
-            echo "APK size: ${SIZE_MB} MB"
+          if [ -f sinema-jamaiya.apk ]; then
+            SIZE_MB=$(du -m sinema-jamaiya.apk | cut -f1)
             if [ "$SIZE_MB" -lt 45 ]; then
-              cp "$APK" /tmp/dist/sinema-jamaiya-arm64.apk
+              cp sinema-jamaiya.apk /tmp/dist/sinema-jamaiya.apk
             else
-              # تقسيم لأجزاء 40MB لاحترام حدّ GitHub للملفات
-              split -b 40m -d -a 2 "$APK" /tmp/dist/parts/watch-together.apk.part-
-              (cd /tmp/dist/parts && sha256sum watch-together.apk.part-* > SHA256SUMS)
+              split -b 40m -d -a 2 sinema-jamaiya.apk /tmp/dist/parts/sinema-jamaiya.apk.part-
+              (cd /tmp/dist/parts && sha256sum sinema-jamaiya.apk.part-* > SHA256SUMS)
             fi
-          else
-            echo "BUILD_MISSING" > /tmp/dist/BUILD_MISSING.txt
           fi
-
-          # فرع يتيم يحتوي المخرجات فقط
           git checkout --orphan builds-apk
           git rm -rf --cached . >/dev/null 2>&1 || true
           find . -maxdepth 1 -mindepth 1 ! -name '.git' -exec rm -rf {} +
           cp -r /tmp/dist ./dist
           git add dist
-          git -c commit.gpgsign=false commit -m "apk build ${{ github.run_id }}"
+          git -c commit.gpgsign=false commit -m "apk build ${{ github.run_id }}" || true
           git push -f origin HEAD:refs/heads/builds/apk
