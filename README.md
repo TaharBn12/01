@@ -1,101 +1,108 @@
-# 🛒 Mobile POS & Billing App 
+# 🎬 سينما جماعية — Watch Together
 
-A feature-rich, high-performance offline-first billing and Point of Sale (POS) application built with Flutter. Designed for seamless retail checkout operations featuring barcode scanning, thermal Bluetooth printing, and robust local data persistence.
+تطبيق **مشاهدة جماعية للفيديو** مبني بفلاتر (Flutter) وقاعدة بيانات Firebase، بتصميم سينمائي احترافي وواجهة عربية كاملة (RTL).
 
-## Screenshot
+أنشئ غرفة، اختر فيديو من يوتيوب أو رابط مباشر أو من داخل المتصفح المدمج، ثم شارك كود الغرفة مع أصدقائك لتشاهدوا معًا في نفس اللحظة مع **دردشة حيّة ومزامنة فورية للتشغيل**.
 
+---
 
-https://github.com/user-attachments/assets/f2d16454-5408-43b3-b207-cd843bbc2c9e
+## ✨ المميزات
 
+- 🔐 **تسجيل حساب / دخول** عبر البريد وكلمة المرور (Firebase Authentication) مع استعادة كلمة المرور.
+- 🏠 **الصفحة الرئيسية**: عرض كل الغرف المنشأة لحظيًّا (Firestore) مع بحث وفلاتر (نشط الآن، يوتيوب، روابط مباشرة) وشبكة غرف بتصميم بطاقات احترافي.
+- ➕ **إنشاء غرفة**: اسم الغرفة + رابط المشاهدة مع اكتشاف تلقائي لنوع المصدر، واختصارات لمواقع مشهورة (يوتيوب، جوجل، تيك توك، فيسبوك، إكس، إنستغرام...).
+- 🌐 **المتصفح الداخلي**:
+  - يفتح أي موقع ويزود بشريط عنوان وأزرار تنقّل.
+  - يحقن سكربت مراقبة يلتقط **رابط الفيديو المباشر (mp4 / m3u8 / webm...) فور تشغيله** داخل الصفحة.
+  - يلتقط روابط يوتيوب تلقائيًّا ويعرض زرًّا مباشرًّا لاستخدامها.
+- ▶️ **صفحة المشاهدة**:
+  - مشغّل يوتيوب مدمج (`youtube_player_iframe`).
+  - مشغّل روابط مباشرة يدعم mp4 و **HLS/m3u8** (`video_player` + `chewie`).
+  - عرض صفحات الويب العامة داخل WebView.
+  - **مزامنة جماعية**: المضيف يتحكم بالتشغيل/الإيقاف والتقديم، وينعكس ذلك فورًا على جميع الحضور.
+  - تغيير الفيديو من المضيف ومزامنته للجميع، وإنهاء البث.
+- 💬 **الدردشة الحيّة أثناء المشاهدة** + قائمة حضور بشارة المضيف وعدّاد مشاهدين.
+- 🔗 **دعوة الأصدقاء** بكود غرفة قصير (6 خانات) أو رابط مشاركة، ودخول سريع بالكود.
+- ⚙️ **صفحة الإعدادات**: الملف الشخصي، الوضع الليلي/النهاري، التشغيل التلقائي، الإشعارات، جودة الفيديو، تغيير كلمة المرور، تسجيل الخروج.
 
+## 🧱 البنية التقنية
 
-## 🎯 Project Scope
-
-This application serves as a complete offline POS system for small to medium-sized retail shops. It streamlines the checkout process, catalog management, and receipt generation securely entirely on-device.
-
-### Core Features:
-- **Product Management System**: Complete CRUD operations for inventory items with barcode/QR code support.
-- **Smart Checkout System**: Rapid cart building via camera-based barcode scanning or manual entry, and robust order calculation functionality.
-- **Bluetooth Thermal Printing**: Direct integration with thermal printers (`print_bluetooth_thermal`) to instantly output physical receipts.
-- **Shop Settings & Customization**: Centrally managed shop details printed dynamically on receipts.
-- **Offline-First Architecture**: Powered by `Hive` for lightning-fast localized NoSQL data storage. No active internet connectivity required.
-
-## 🛠 Tech Stack & Architecture
-
-Built leveraging industry-standard architectural principles (Clean Architecture & Feature-Driven Design) ensuring scalability, separation of concerns, and robust testability. 
-
-- **Framework**: [Flutter](https://flutter.dev/) (SDK >=3.1.0)
-- **State Management**: `flutter_bloc`
-- **Dependency Injection**: `get_it`
-- **Routing**: `go_router`
-- **Local Database**: `hive` & `hive_flutter`
-- **Data Modeling**: `json_serializable`, `equatable`
-- **Functional Programming**: `fpdart`
-- **Hardware Integrations**: `mobile_scanner` (barcodes), `print_bluetooth_thermal`
-
-## 📁 File Structure
-
-The codebase is organized using a **Feature-First Clean Architecture** utilizing domain-driven concepts.
-
-```text
+```
 lib/
-├── core/                       # Core application utilities and shared components
-│   ├── data/                   # Global data sources (e.g., Hive initialization)
-│   ├── error/                  # Standardized Failure/Exception models (fpdart compatible)
-│   ├── theme/                  # UI aesthetics, typography, styling
-│   ├── usecase/                # Base UseCase contracts
-│   ├── utils/                  # Helpers (e.g., PrinterHelper, formatters)
-│   ├── widgets/                # Reusable global UI widgets (AppBars, generic buttons)
-│   └── service_locator.dart    # get_it dependency injection setup
-│
-└── features/                   # Independent feature modules
-    ├── billing/                # Core POS operations: Cart, Checkout, Invoice Generation
-    ├── product/                # Inventory management: Adding, Listing, Scanning products
-    ├── settings/               # App configuration: Printer connections, App settings
-    └── shop/                   # Shop details configuration
+├── main.dart                  # نقطة التشغيل وتهيئة Firebase ومزوّدي الحالة
+├── app.dart                   # MaterialApp والثيم واللغة العربية
+├── router.dart                # go_router + حماية المسارات بالمصادقة
+├── firebase_options.dart      # ⚠️ مفاتيح Firebase (placeholders — استبدلها)
+├── core/
+│   ├── theme/                 # ثيم سينمائي داكن وفاتح (خط Cairo)
+│   ├── constants/             # ثوابت التطبيق واختصارات المواقع
+│   ├── utils/                 # أدوات الروابط والفيديو والتنسيق والتحقق
+│   └── widgets/               # أزرار وحقول وحالات عرض مشتركة
+└── features/
+    ├── auth/                  # بيانات المستخدم + صفحتا الدخول والتسجيل
+    ├── rooms/                 # الغرف: الرئيسية، الإضافة، المتصفح، المشاهدة، الدردشة
+    └── settings/              # الإعدادات
 ```
 
-*Note: Each feature is further subdivided internally into Clean Architecture layers: `data`, `domain`, and `presentation`.*
+### مجموعات Firestore
 
-## 💡 Use Cases
+```
+users/{uid}
+rooms/{roomCode}
+rooms/{roomCode}/participants/{uid}
+rooms/{roomCode}/messages/{messageId}
+```
 
-- **Rapid Billing Entry**: A cashier launches the app, navigates to the checkout page, and uses the device camera to instantly scan product barcodes. The products are added to the cart, the total is calculated including taxes, and a receipt is finalized.
-- **Physical Receipt Generation**: After checkout confirmation, the app triggers a connected external Bluetooth thermal POS printer to instantly print an itemized paper receipt with the shop’s header.
-- **Inventory Sideloading**: A manager opens the Product feature to add new stock to the local database, taking a picture of the barcode to bind the SKU for future lightning-fast checkouts.
-- **No-Connection Operation**: The business operates a stall at an exhibition with poor networking. The app functions entirely via its embedded Hive local database and Bluetooth, completely undisturbed by network drops.
+## 🚀 خطوات التشغيل
 
-## 🚀 Getting Started
+### 1) تجهيز Flutter
+- Flutter 3.27+ (Channel: stable)، وDart 3.5+
+- أندرويد: minSdk 23 فأعلى (مضبوط في المشروع)
+- iOS: 13+
 
-### Prerequisites
-- Flutter SDK `^3.1.0` or higher
-- Android Studio / Xcode for emulators and building.
-- *Optional*: A physical Android/iOS device and a Bluetooth Thermal Printer for testing hardware integrations natively.
+```bash
+flutter pub get
+```
 
-### Installation
-
-1. Clone the repository and navigate to the project directory:
+### 2) إنشاء مشروع Firebase
+1. أنشئ مشروعًا على <https://console.firebase.google.com>
+2. فعّل **Authentication → Email/Password**
+3. فعّل **Cloud Firestore** وأنشئ قاعدة البيانات (وضع الإنتاج ثم الصق قواعد `firestore.rules`)
+4. انشر قواعد الأمان:
    ```bash
-   git clone <repository_url>
-   cd billing_app
+   firebase deploy --only firestore:rules
    ```
 
-2. Fetch dependencies:
-   ```bash
-   flutter pub get
-   ```
+### 3) ربط التطبيق بـ Firebase (الأسهل: FlutterFire CLI)
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure
+```
+سيولّد الأمر ملف `lib/firebase_options.dart` بمفاتيح حقيقية ويستبدل القيم المؤقتة، وأضف تطبيقات Android (package: `com.watchtogether.cinema`) وiOS والويب.
 
-3. Run code generation (required for Hive adapters and JSON serialization):
-   ```bash
-   dart run build_runner build --delete-conflicting-outputs
-   ```
+> بدونه: عدّل القيم المؤقتة يدويًّا في `lib/firebase_options.dart` (`YOUR_PROJECT_ID`, المفاتيح...).
 
-4. Run the project:
-   ```bash
-   flutter run
-   ```
+### 4) التشغيل
+```bash
+flutter run
+```
+للويب:
+```bash
+flutter run -d chrome
+```
+(المتصفح الداخلي متاح على الجوال؛ على الويب يُلصق الرابط يدويًّا).
 
-## 🤝 Contributing Guidelines
-As a senior-focused project, please adhere to:
-1. **Clean Architecture Rules**: Maintain strict boundaries between `domain`, `data`, and `presentation` layers.
-2. **Immutable States**: Emit only immutable states from BLoCs utilizing `equatable`.
-3. **No Direct Exceptions in Domain**: Utilize `fpdart`'s `Either<Failure, Type>` pattern to handle control flow for exceptions.
+## 🔌 أهم الحزم
+- `firebase_core`, `firebase_auth`, `cloud_firestore`
+- `provider` لإدارة الحالة و`go_router` للتنقل
+- `webview_flutter` للمتصفح الداخلي
+- `youtube_player_iframe` لمشغّل يوتيوب
+- `video_player` + `chewie` للروابط المباشرة وHLS
+- `google_fonts` (خط Cairo)، `cached_network_image`، `share_plus`، `url_launcher`، `shared_preferences`
+
+## 📝 ملاحظات
+- بعض المواقع تمنع تضمين فيديوهاتها أو تستخدم تشفير MSE (روابط `blob:`) فيتعذّر استخراج رابط مباشر منها؛ استخدم رابط يوتيوب أو الصفحة مباشرة (تُعرض داخل WebView).
+- عدّاد الحضور يُحدَّث عند الدخول/الخروج؛ يمكن تعزيزه لاحقًا بـ presence عبر Realtime Database.
+- قبل النشر على المتاجر استبدل مفتاح توقيع الإصدار (release) في `android/app/build.gradle.kts`.
+
+استمتعوا بالمشاهدة الجماعية 🍿

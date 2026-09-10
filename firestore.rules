@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isRoomHost(roomId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid;
+    }
+
+    // المستخدمون: القراءة للجميع المسجلين، الكتابة لصاحب الحساب فقط
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /rooms/{roomId} {
+      // قائمة الغرف وبياناتها متاحة للمسجلين
+      allow read: if isSignedIn();
+      // أي مستخدم مسجل يمكنه إنشاء غرفة، ويجب أن يكون هو المضيف
+      allow create: if isSignedIn() &&
+        request.resource.data.hostUid == request.auth.uid;
+      // التحديث (المزامنة، تغيير الفيديو، العدّاد) للمضيف أو لأي عضو مسجل
+      allow update: if isSignedIn();
+      // الحذف متروك للمضيف عبر لوحة تحكم Firebase أو أدوات الإدارة
+      allow delete: if false;
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+          request.resource.data.name is string;
+        allow update, delete: if isSignedIn();
+      }
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string;
+        allow update, delete: if isSignedIn() &&
+          resource.data.uid == request.auth.uid;
+      }
+    }
+  }
+}

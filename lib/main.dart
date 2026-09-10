@@ -1,90 +1,56 @@
-import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:billing_app/l10n/app_localizations.dart';
-import 'config/routes/app_routes.dart';
-import 'core/data/hive_database.dart';
-import 'core/service_locator.dart' as di;
-import 'core/theme/app_theme.dart';
-import 'features/billing/presentation/bloc/billing_bloc.dart';
-import 'features/product/presentation/bloc/product_bloc.dart';
-import 'features/shop/presentation/bloc/shop_bloc.dart';
-import 'features/settings/presentation/bloc/printer_bloc.dart';
-import 'features/settings/presentation/bloc/printer_event.dart';
-import 'features/expense/presentation/bloc/expense_bloc.dart';
-import 'features/ai_order/presentation/bloc/ai_order_bloc.dart';
-import 'features/ai_assistant/presentation/bloc/assistant_bloc.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
+import 'app.dart';
+import 'features/auth/data/auth_repository.dart';
+import 'features/rooms/data/rooms_repository.dart';
+import 'features/settings/settings_controller.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  String? initError;
+
   try {
-    await HiveDatabase.init();
-    await di.init();
-  } catch (e) {
-    initError = e.toString();
-    debugPrint('Init error: $e');
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (error) {
+    // يظهر التطبيق إن كانت القيم المؤقتة لم تُستبدل، مع طباعة تنبيه واضح.
+    debugPrint('⚠️  تعذّر تهيئة Firebase: $error');
   }
-  runApp(MyApp(initError: initError));
-}
 
-class MyApp extends StatelessWidget {
-  final String? initError;
-  const MyApp({super.key, this.initError});
+  // بيانات التنسيق المحلية (التواريخ والأوقات بالعربية)
+  await initializeDateFormatting('ar', null);
 
-  @override
-  Widget build(BuildContext context) {
-    if (initError != null) {
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text('Error:\n$initError',
-                  style: const TextStyle(color: Colors.red, fontSize: 16)),
-            ),
+  final prefs = await SharedPreferences.getInstance();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => SettingsController(prefs),
+        ),
+        Provider<AuthRepository>(
+          create: (_) => AuthRepository(
+            auth: FirebaseAuth.instance,
+            firestore: FirebaseFirestore.instance,
           ),
         ),
-      );
-    }
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<ProductBloc>(
-            create: (context) => di.sl<ProductBloc>()..add(LoadProducts())),
-        BlocProvider<ShopBloc>(
-            create: (context) => di.sl<ShopBloc>()..add(LoadShopEvent())),
-        BlocProvider<BillingBloc>(
-            create: (context) => BillingBloc(
-          getProductByBarcodeUseCase: di.sl(),
-          invoiceRepository: di.sl(),
-        )),
-        BlocProvider<PrinterBloc>(
-            create: (context) => di.sl<PrinterBloc>()..add(InitPrinterEvent())),
-        BlocProvider<ExpenseBloc>(
-            create: (context) => di.sl<ExpenseBloc>()),
-        BlocProvider<AiOrderBloc>(
-            create: (context) => di.sl<AiOrderBloc>()),
-        BlocProvider<AssistantBloc>(
-            create: (context) => di.sl<AssistantBloc>()),
+        Provider<RoomsRepository>(
+          create: (_) => RoomsRepository(FirebaseFirestore.instance),
+        ),
+        StreamProvider<User?>(
+          initialData: FirebaseAuth.instance.currentUser,
+          create: (context) =>
+              context.read<AuthRepository>().authStateChanges(),
+        ),
       ],
-      child: MaterialApp.router(
-        title: 'Billing App',
-        theme: AppTheme.lightTheme,
-        routerConfig: router,
-        debugShowCheckedModeBanner: false,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('en'),
-          Locale('vi'),
-        ],
-        locale: const Locale('vi'),
-      ),
-    );
-  }
+      child: const CinemaApp(),
+    ),
+  );
 }

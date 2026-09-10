@@ -1,0 +1,49 @@
+name: CI — سينما جماعية
+
+on:
+  push:
+    branches: [main, master, arena/**]
+  pull_request:
+
+jobs:
+  analyze-and-test:
+    name: فحص الكود واختبارات الوحدات
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تنصيب Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.38.0'
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: فحص الصياغة (analyze)
+        run: flutter analyze
+
+      - name: الاختبارات
+        run: flutter test
+
+  build-android:
+    name: بناء تطبيق Android (APK)
+    runs-on: ubuntu-latest
+    needs: analyze-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تنصيب Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.38.0'
+
+      - name: pub get
+        run: flutter pub get
+
+      # ملاحظة: يجب استبدال مفاتيح Firebase في lib/firebase_options.dart
+      # عبر سرّ في GitHub (FIREBASE_OPTIONS) أو flutterfire configure قبل البناء الإنتاجي.
+      - name: بناء APK تجريبي
+        run: flutter build apk --debug
