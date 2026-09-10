@@ -52,9 +52,9 @@ class RoomCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: room.thumbnailUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) =>
+                        placeholder: (_, _) =>
                             const ColoredBox(color: AppColors.surfaceVariant),
-                        errorWidget: (_, __, ___) =>
+                        errorWidget: (_, _, _) =>
                             _ThumbPlaceholder(icon: _sourceIcon),
                       )
                     else

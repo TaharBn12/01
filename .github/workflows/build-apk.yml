@@ -46,13 +46,13 @@ jobs:
           set -o pipefail
           flutter analyze 2>&1 | tee logs/analyze.log
 
-      - name: بناء APK (debug — arm64 للهواتف الحديثة)
+      - name: بناء APK (release — arm64 للهواتف الحديثة)
         id: build
         shell: bash
         continue-on-error: true
         run: |
           set -o pipefail
-          flutter build apk --debug --target-platform android-arm64 2>&1 | tee logs/build.log
+          flutter build apk --release --target-platform android-arm64 2>&1 | tee logs/build.log
 
       - name: سجلّات في ملخص التشغيل
         if: always()
@@ -94,12 +94,12 @@ jobs:
           cp logs/*.log /tmp/dist/logs/ 2>/dev/null || true
           [ -f pubspec.lock ] && cp pubspec.lock /tmp/dist/ || true
 
-          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
           if [ -f "$APK" ]; then
             SIZE_MB=$(du -m "$APK" | cut -f1)
             echo "APK size: ${SIZE_MB} MB"
             if [ "$SIZE_MB" -lt 45 ]; then
-              cp "$APK" /tmp/dist/watch-together-debug-arm64.apk
+              cp "$APK" /tmp/dist/sinema-jamaiya-arm64.apk
             else
               # تقسيم لأجزاء 40MB لاحترام حدّ GitHub للملفات
               split -b 40m -d -a 2 "$APK" /tmp/dist/parts/watch-together.apk.part-
