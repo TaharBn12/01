@@ -4,47 +4,47 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
-  flutter: '>=3.27.0'
+  sdk: ^3.10.0
+  flutter: '>=3.38.0'
 
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  cupertino_icons: any
+  cupertino_icons: ^1.0.9
 
   # Firebase
-  firebase_core: any
-  firebase_auth: any
-  cloud_firestore: any
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
 
   # إدارة الحالة
-  provider: any
+  provider: ^6.1.5
 
   # التنقل
-  go_router: any
+  go_router: ^18.0.1
 
   # تشغيل الوسائط والمتصفح الداخلي
-  webview_flutter: any
-  youtube_player_iframe: any
-  video_player: any
-  chewie: any
+  webview_flutter: ^4.14.1
+  youtube_player_iframe: ^6.0.2
+  video_player: ^2.14.0
+  chewie: ^1.16.2
 
   # الواجهات
-  google_fonts: any
-  cached_network_image: any
+  google_fonts: ^8.2.1
+  cached_network_image: ^4.0.0
 
   # أدوات مساعدة
-  intl: any
-  shared_preferences: any
-  share_plus: any
-  url_launcher: any
+  intl: ^0.20.3
+  shared_preferences: ^2.5.5
+  share_plus: ^13.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: any
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

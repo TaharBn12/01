@@ -42,7 +42,8 @@ Future<void> main() async {
           ),
         ),
         Provider<RoomsRepository>(
-          create: (_) => RoomsRepository(FirebaseFirestore.instance),
+          create: (_) =>
+              RoomsRepository(firestore: FirebaseFirestore.instance),
         ),
         StreamProvider<User?>(
           initialData: FirebaseAuth.instance.currentUser,

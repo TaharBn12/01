@@ -72,7 +72,7 @@ class _YoutubePlayerBoxState extends State<YoutubePlayerBox>
       startSeconds =
           (initial.positionSeconds + elapsed).clamp(0, 100000).toDouble();
     }
-    await _controller.isReady;
+    // الجسر الداخلي يصفّ الأوامر حتى اكتمال تهيئة المشغّل
     await _controller.loadVideoById(
       videoId: widget.videoId,
       startSeconds: startSeconds > 1 ? startSeconds : null,

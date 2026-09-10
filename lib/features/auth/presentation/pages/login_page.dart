@@ -82,6 +82,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
     if (result == null || result.isEmpty) return;
+    if (!mounted) return;
     try {
       await context.read<AuthRepository>().sendPasswordReset(result);
       _snack('أُرسل رابط الاستعادة إلى بريدك ✉️');

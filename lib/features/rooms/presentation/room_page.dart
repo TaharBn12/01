@@ -90,11 +90,13 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Future<void> _share(RoomModel room) async {
-    await Share.share(
-      '🎬 أدعوك لمشاهدة «${room.name}» معي في سينما جماعية!\n'
-      'كود الغرفة: ${room.id}\n'
-      'أو افتح الرابط: https://watchtogether.app/room/${room.id}',
-      subject: 'دعوة مشاهدة جماعية',
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: 'دعوة مشاهدة جماعية',
+        text: '🎬 أدعوك لمشاهدة «${room.name}» معي في سينما جماعية!\n'
+            'كود الغرفة: ${room.id}\n'
+            'أو افتح الرابط: https://watchtogether.app/room/${room.id}',
+      ),
     );
   }
 
@@ -338,7 +340,7 @@ class _RoomPageState extends State<RoomPage> {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.sensor_off_rounded, size: 16, color: AppColors.live),
+            Icon(Icons.videocam_off_rounded, size: 16, color: AppColors.live),
             SizedBox(width: 8),
             Text(
               'انتهى بث هذه الغرفة',
