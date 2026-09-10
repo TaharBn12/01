@@ -1,0 +1,35 @@
+name: Perm Probe
+
+on:
+  push:
+    branches: [arena/**]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: محاولة الدفع لفرع تجريبي عبر git
+        shell: bash
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git checkout --orphan ci-probe
+          echo "probe $(date)" > PROBE.txt
+          git add PROBE.txt
+          git commit -m "probe"
+          git push -f origin HEAD:refs/heads/ci-probe
+
+      - name: محاولة الكتابة عبر API المحتويات
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X PUT repos/${{ github.repository }}/contents/PROBE-API.txt \
+            -f message="probe api" \
+            -f content="$(echo probe | base64)"
