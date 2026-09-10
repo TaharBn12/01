@@ -1,0 +1,58 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [arena/**]
+
+jobs:
+  build:
+    name: بناء ملف APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تنصيب Flutter (أحدث إصدار مستقر)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: إظهار الإصدارات
+        run: |
+          flutter --version
+          java -version
+
+      - name: تجهيز مجلد السجلات
+        run: mkdir -p logs
+
+      - name: flutter pub get
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee logs/pubget.log
+
+      - name: flutter analyze
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee logs/analyze.log
+
+      - name: بناء APK (debug)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee logs/build.log
+
+      - name: رفع APK والسجلات
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-together-apk
+          if-no-files-found: ignore
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            logs/*.log
+            pubspec.lock
+          retention-days: 14
