@@ -3,10 +3,12 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // إضافة خدمات Google (google-services.json)
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.watchtogether.cinema"
+    namespace = "com.chatme.ltc"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.watchtogether.cinema"
+        applicationId = "com.chatme.ltc"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -32,7 +34,7 @@ android {
 
     buildTypes {
         release {
-            // TODO: Sign the release with your own keystore before publishing.
+            // TODO: استبدل مفتاح التوقيع بمفتاحك الخاص قبل النشر على المتجر.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

@@ -1,4 +1,4 @@
-package com.watchtogether.cinema
+package com.chatme.ltc
 
 import io.flutter.embedding.android.FlutterActivity
 

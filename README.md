@@ -75,23 +75,21 @@ rooms/{roomCode}/messages/{messageId}
 flutter pub get
 ```
 
-### 2) إنشاء مشروع Firebase
-1. أنشئ مشروعًا على <https://console.firebase.google.com>
-2. فعّل **Authentication → Email/Password**
-3. فعّل **Cloud Firestore** وأنشئ قاعدة البيانات (وضع الإنتاج ثم الصق قواعد `firestore.rules`)
-4. انشر قواعد الأمان:
+### 2) إعداد Firebase (مُنجَز لهذا المشروع)
+المشروع مربوط مسبقًا بمشروع Firebase التالي، وملف `android/app/google-services.json` و`lib/firebase_options.dart` يحملان القيم الحقيقية:
+
+- **Project ID:** `livematch-8e189`
+- **اسم حزمة أندرويد:** `com.chatme.ltc`
+
+المتبقي فقط تفعيل الخدمات من <https://console.firebase.google.com/project/livematch-8e189>:
+1. فعّل **Authentication → Sign-in method → Email/Password**.
+2. فعّل **Cloud Firestore** (أنشئ قاعدة البيانات بوضع الإنتاج).
+3. الصق قواعد `firestore.rules` وانشرها:
    ```bash
    firebase deploy --only firestore:rules
    ```
 
-### 3) ربط التطبيق بـ Firebase (الأسهل: FlutterFire CLI)
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-سيولّد الأمر ملف `lib/firebase_options.dart` بمفاتيح حقيقية ويستبدل القيم المؤقتة، وأضف تطبيقات Android (package: `com.watchtogether.cinema`) وiOS والويب.
-
-> بدونه: عدّل القيم المؤقتة يدويًّا في `lib/firebase_options.dart` (`YOUR_PROJECT_ID`, المفاتيح...).
+> لدعم iOS أو الويب: أضف التطبيق من Console ثم شغّل `flutterfire configure` لتعبئة القيم الناقصة في `lib/firebase_options.dart`.
 
 ### 4) التشغيل
 ```bash

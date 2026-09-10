@@ -1,14 +1,11 @@
 // **************************************************************************
-// إعدادات Firebase
-// **************************************************************************
-// هذا الملف يحتوي قيمًا مؤقتة (placeholders).
-// قبل تشغيل التطبيق فعليًّا، ولّد ملفًا حقيقيًّا بأمر FlutterFire:
+// إعدادات Firebase — مشروع livematch-8e189
+// القيم الأندرويد حقيقية ومطابقة لملف android/app/google-services.json
+// (اسم الحزمة: com.chatme.ltc)
 //
-//     dart pub global activate flutterfire_cli
+// لدعم iOS أو الويب: سجّل التطبيق في Firebase Console ثم شغّل
 //     flutterfire configure
-//
-// سيستبدل الأمرُ القيمَ أدناه بمفاتيح مشروعك على Firebase تلقائيًّا.
-// راجع ملف README.md لخطوات الإعداد الكاملة.
+// ليملأ القيم الناقصة لهاتين المنصتين تلقائيًّا.
 // **************************************************************************
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
@@ -33,28 +30,31 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_WEB_API_KEY',
+    apiKey: 'AIzaSyBYOnFMm3RlrDG54QbnFl4cWmPg3hMTnUg',
+    // ⚠️ سجّل تطبيق ويب في Firebase Console ثم ضع معرّفه (1:...:web:...) هنا
     appId: 'YOUR_WEB_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
+    messagingSenderId: '588476650085',
+    projectId: 'livematch-8e189',
+    authDomain: 'livematch-8e189.firebaseapp.com',
+    storageBucket: 'livematch-8e189.appspot.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_ANDROID_API_KEY',
-    appId: 'YOUR_ANDROID_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
+    apiKey: 'AIzaSyBYOnFMm3RlrDG54QbnFl4cWmPg3hMTnUg',
+    appId: '1:588476650085:android:d213c875d1033e6edc2c8c',
+    messagingSenderId: '588476650085',
+    projectId: 'livematch-8e189',
+    storageBucket: 'livematch-8e189.appspot.com',
+    databaseURL: 'https://livematch-8e189-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
+    // ⚠️ أضف تطبيق iOS في Firebase Console ثم استبدل القيم عبر flutterfire configure
     apiKey: 'YOUR_IOS_API_KEY',
     appId: 'YOUR_IOS_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
+    messagingSenderId: '588476650085',
+    projectId: 'livematch-8e189',
+    storageBucket: 'livematch-8e189.appspot.com',
     iosBundleId: 'com.watchtogether.cinema',
   );
 }
