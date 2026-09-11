@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class MessageModel {
   const MessageModel({
@@ -7,7 +7,7 @@ class MessageModel {
     required this.uid,
     required this.senderName,
     this.senderPhotoUrl,
-    this.createdAt,
+    this.createdAtMs,
   });
 
   final String id;
@@ -15,26 +15,33 @@ class MessageModel {
   final String uid;
   final String senderName;
   final String? senderPhotoUrl;
-  final DateTime? createdAt;
+  final int? createdAtMs;
 
-  factory MessageModel.fromDoc(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    return MessageModel(
-      id: doc.id,
-      text: (data['text'] ?? '') as String,
-      uid: (data['uid'] ?? '') as String,
-      senderName: (data['senderName'] ?? 'مشاهد') as String,
-      senderPhotoUrl: data['senderPhotoUrl'] as String?,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-    );
-  }
+  DateTime? get createdAt => createdAtMs == null
+      ? null
+      : DateTime.fromMillisecondsSinceEpoch(createdAtMs!);
+
+  factory MessageModel.fromSnapshot(DataSnapshot snapshot) =>
+      MessageModel.fromMap(
+        Map<dynamic, dynamic>.from((snapshot.value as Map?) ?? const {}),
+        snapshot.key ?? '',
+      );
+
+  factory MessageModel.fromMap(Map<dynamic, dynamic> data, String id) =>
+      MessageModel(
+        id: id,
+        text: (data['text'] ?? '') as String,
+        uid: (data['uid'] ?? '') as String,
+        senderName: (data['senderName'] ?? 'مشاهد') as String,
+        senderPhotoUrl: data['senderPhotoUrl'] as String?,
+        createdAtMs: (data['createdAt'] as num?)?.toInt(),
+      );
 
   Map<String, dynamic> toMap() => {
         'text': text,
         'uid': uid,
         'senderName': senderName,
         'senderPhotoUrl': senderPhotoUrl,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': ServerValue.timestamp,
       };
 }

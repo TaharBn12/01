@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +19,7 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (error) {
-    // يظهر التطبيق إن كانت القيم المؤقتة لم تُستبدل، مع طباعة تنبيه واضح.
+    // يظهر التطبيق إن لم تتهيأ Firebase، مع طباعة تنبيه واضح.
     debugPrint('⚠️  تعذّر تهيئة Firebase: $error');
   }
 
@@ -36,14 +35,10 @@ Future<void> main() async {
           create: (_) => SettingsController(prefs),
         ),
         Provider<AuthRepository>(
-          create: (_) => AuthRepository(
-            auth: FirebaseAuth.instance,
-            firestore: FirebaseFirestore.instance,
-          ),
+          create: (_) => AuthRepository(),
         ),
         Provider<RoomsRepository>(
-          create: (_) =>
-              RoomsRepository(firestore: FirebaseFirestore.instance),
+          create: (_) => RoomsRepository(),
         ),
         StreamProvider<User?>(
           initialData: FirebaseAuth.instance.currentUser,

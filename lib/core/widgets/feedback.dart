@@ -133,15 +133,18 @@ class ErrorView extends StatelessWidget {
 
   static String _friendlyError(Object error) {
     final text = error.toString();
-    if (text.contains('permission-denied')) {
+    if (text.contains('permission-denied') ||
+        text.toLowerCase().contains('permission denied')) {
       return 'لا تملك صلاحية الوصول إلى هذا المحتوى. سجّل الدخول وحاول مجددًا.';
     }
     if (text.contains('network') ||
         text.contains('SocketException') ||
+        text.contains('disconnected') ||
+        text.toLowerCase().contains('network error') ||
         text.contains('FAILED_PRECONDITION')) {
       return 'تعذّر الاتصال بالخادم. تحقق من اتصالك بالإنترنت.';
     }
-    if (text.contains('not-found')) {
+    if (text.contains('not-found') || text.contains('غير موجودة')) {
       return 'الغرفة غير موجودة أو تم إنهاؤها.';
     }
     return 'حدث خطأ غير متوقع. حاول مرة أخرى بعد قليل.';

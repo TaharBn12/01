@@ -37,6 +37,7 @@ class DefaultFirebaseOptions {
     projectId: 'livematch-8e189',
     authDomain: 'livematch-8e189.firebaseapp.com',
     storageBucket: 'livematch-8e189.appspot.com',
+    databaseURL: 'https://livematch-8e189-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '588476650085',
     projectId: 'livematch-8e189',
     storageBucket: 'livematch-8e189.appspot.com',
+    databaseURL: 'https://livematch-8e189-default-rtdb.firebaseio.com',
     iosBundleId: 'com.watchtogether.cinema',
   );
 }

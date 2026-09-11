@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
+import '../../../../../core/utils/realtime_clock.dart';
 import '../../../data/room_model.dart';
 import 'player_sync.dart';
 
@@ -66,9 +67,9 @@ class _YoutubePlayerBoxState extends State<YoutubePlayerBox>
   Future<void> _prepare() async {
     double startSeconds = 0;
     final initial = widget.initialPlayback;
-    if (!widget.isHost && initial != null) {
-      final elapsed = DateTime.now().difference(initial.updatedAt).inMilliseconds /
-          1000;
+    if (!widget.isHost && initial != null && initial.isPlaying) {
+      final elapsed =
+          (RealtimeClock.nowMs - initial.updatedAtMs) / 1000.0;
       startSeconds =
           (initial.positionSeconds + elapsed).clamp(0, 100000).toDouble();
     }

@@ -30,31 +30,28 @@ class _AddRoomPageState extends State<AddRoomPage> {
   @override
   void initState() {
     super.initState();
-    _urlCtrl.addListener(_refreshDetection);
+    _urlCtrl.addListener(_refresh);
   }
 
   @override
   void dispose() {
-    _urlCtrl.removeListener(_refreshDetection);
+    _urlCtrl.removeListener(_refresh);
     _nameCtrl.dispose();
     _urlCtrl.dispose();
     super.dispose();
   }
 
-  void _refreshDetection() {
+  void _refresh() {
     final text = _urlCtrl.text.trim();
-    if (text.isEmpty) {
-      if (_video != null) setState(() => _video = null);
-      return;
+    final info = text.isEmpty ? null : VideoUtils.inspect(text);
+    if (info?.source != _video?.source || info?.url != _video?.url) {
+      setState(() => _video = info);
     }
-    final info = VideoUtils.inspect(text);
-    setState(() => _video = info);
   }
 
   Future<void> _openBrowser(String? url) async {
     if (kIsWeb) {
-      _snack('المتصفح الداخلي متاح داخل تطبيق الجوال. '
-          'على الويب الصق الرابط مباشرة.');
+      _snack('المتصفح الداخلي متاح على تطبيق الجوال، الصق الرابط مباشرة.');
       return;
     }
     final result = await context.push<String>(
@@ -62,11 +59,11 @@ class _AddRoomPageState extends State<AddRoomPage> {
     );
     if (result != null && result.isNotEmpty) {
       _urlCtrl.text = result;
-      _refreshDetection();
+      _refresh();
     }
   }
 
-  Future<void> _createRoom() async {
+  Future<void> _create() async {
     if (!_formKey.currentState!.validate()) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -83,8 +80,8 @@ class _AddRoomPageState extends State<AddRoomPage> {
       if (mounted) context.pushReplacement('/room/${room.id}');
     } on RoomsFailure catch (e) {
       _snack(e.message);
-    } catch (e) {
-      _snack('تعذّر إنشاء الغرفة، تأكد من اتصالك وإعداد Firebase.');
+    } catch (_) {
+      _snack('تعذّر إنشاء الغرفة، تحقق من اتصالك وبيانات Firebase.');
     } finally {
       if (mounted) setState(() => _creating = false);
     }
@@ -100,312 +97,273 @@ class _AddRoomPageState extends State<AddRoomPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('إنشاء غرفة مشاهدة')),
+      appBar: AppBar(title: const Text('إنشاء غرفة')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionCard(
-                  step: '1',
-                  title: 'بيانات الغرفة',
-                  child: Column(
-                    children: [
-                      AppTextField(
-                        controller: _nameCtrl,
-                        label: 'اسم الغرفة',
-                        hint: 'مثال: سهرة فيلم الرعب 🍿',
-                        prefixIcon: Icons.meeting_room_outlined,
-                        validator: Validators.roomName,
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _SectionCard(
-                  step: '2',
-                  title: 'ماذا ستشاهدون؟',
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Form(
+                  key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const _Intro(),
+                      const SizedBox(height: 24),
+                      const _Label('اسم الغرفة'),
+                      const SizedBox(height: 8),
+                      AppTextField(
+                        controller: _nameCtrl,
+                        hint: 'مثال: سهرة فيلم الجمعة 🍿',
+                        prefixIcon: Icons.movie_filter_rounded,
+                        validator: Validators.roomName,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 22),
+                      const _Label('رابط المشاهدة'),
+                      const SizedBox(height: 8),
                       AppTextField(
                         controller: _urlCtrl,
-                        label: 'رابط مباشر للفيديو',
-                        hint: 'https://youtube.com/watch?v=... أو رابط mp4/m3u8',
+                        hint: 'رابط يوتيوب أو رابط فيديو مباشر (mp4 / m3u8)',
                         prefixIcon: Icons.link_rounded,
                         keyboardType: TextInputType.url,
                         validator: Validators.videoUrl,
                         suffix: IconButton(
-                          tooltip: 'لصق من المتصفح',
+                          tooltip: 'التقاط من المتصفح',
                           icon: const Icon(Icons.travel_explore_rounded,
                               color: AppColors.primaryLight),
                           onPressed: () => _openBrowser(null),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _DetectionBanner(video: _video),
                       const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
+                      _DetectionPill(video: _video),
+                      const SizedBox(height: 22),
+                      const _Label('تصفّح موقعًا لالتقاط الفيديو'),
+                      const SizedBox(height: 10),
+                      _QuickSitesRow(onSelect: _openBrowser),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
                           onPressed: () => _openBrowser(null),
-                          style: OutlinedButton.styleFrom(
+                          icon: const Icon(Icons.language_rounded, size: 19),
+                          label: const Text('فتح المتصفح الداخلي'),
+                          style: TextButton.styleFrom(
                             foregroundColor: AppColors.primaryLight,
-                            side: const BorderSide(color: AppColors.primary),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          icon: const Icon(Icons.language_rounded),
-                          label: const Text(
-                            'فتح المتصفح والتقاط رابط الفيديو تلقائيًّا',
-                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    'مواقع سريعة',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _QuickSites(onSelect: _openBrowser),
-                const SizedBox(height: 26),
-                GradientButton(
-                  label: 'إنشاء الغرفة وبدء المشاهدة',
-                  icon: Icons.play_circle_fill_rounded,
-                  loading: _creating,
-                  onPressed: _createRoom,
-                ),
-                const SizedBox(height: 10),
-                const Center(
-                  child: Text(
-                    'سيمكنك دعوة الأصدقاء بكود الغرفة فور إنشائها',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.step,
-    required this.title,
-    required this.child,
-  });
-
-  final String step;
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  gradient: AppGradients.primary,
-                  shape: BoxShape.circle,
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                12 + MediaQuery.of(context).viewPadding.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(
+                  top: BorderSide(color: AppColors.border),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  step,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GradientButton(
+                    label: 'إنشاء الغرفة وبدء المشاهدة',
+                    icon: Icons.play_circle_fill_rounded,
+                    loading: _creating,
+                    onPressed: _create,
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _DetectionBanner extends StatelessWidget {
-  const _DetectionBanner({required this.video});
-  final VideoInfo? video;
-
-  @override
-  Widget build(BuildContext context) {
-    if (video == null || video!.source == VideoSource.unknown) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.help_outline_rounded,
-                size: 18, color: AppColors.textMuted),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'الصق رابطًا ليتم تحديد نوعه تلقائيًّا',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'تحصل على كود دعوة قصير تشاركه مع أصدقائك',
+                    style:
+                        TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-      );
-    }
-    final Color color = switch (video!.source) {
-      VideoSource.youtube => AppColors.youtube,
-      VideoSource.directVideo => AppColors.success,
-      VideoSource.webPage => AppColors.warning,
-      VideoSource.unknown => AppColors.textMuted,
-    };
-    final IconData icon = switch (video!.source) {
-      VideoSource.youtube => Icons.smart_display_rounded,
-      VideoSource.directVideo => Icons.movie_filter_rounded,
-      VideoSource.webPage => Icons.language_rounded,
-      VideoSource.unknown => Icons.help_outline_rounded,
-    };
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 19, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'تم اكتشاف: ${video!.source.label}',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  video!.source.playable
-                      ? 'جاهز للتشغيل داخل الغرفة'
-                      : 'سيُعرض داخل متصفح الغرفة',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.check_circle_rounded, color: color, size: 20),
-        ],
       ),
     );
   }
 }
 
-class _QuickSites extends StatelessWidget {
-  const _QuickSites({required this.onSelect});
+class _Intro extends StatelessWidget {
+  const _Intro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            gradient: AppGradients.primary,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.add_rounded, color: Colors.white),
+        ),
+        const SizedBox(width: 14),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'سهرة جديدة',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'أدخل تفاصيل الغرفة وادعُ أصدقاءك للمشاهدة معًا',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  const _Label(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
+class _DetectionPill extends StatelessWidget {
+  const _DetectionPill({required this.video});
+  final VideoInfo? video;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = video?.source;
+    if (video == null || source == null || source == VideoSource.unknown) {
+      return _hint(
+        Icons.help_outline_rounded,
+        'الصق رابطًا ليتم تحديد نوعه تلقائيًّا',
+        AppColors.textMuted,
+      );
+    }
+    final (color, icon) = switch (source) {
+      VideoSource.youtube => (AppColors.youtube, Icons.smart_display_rounded),
+      VideoSource.directVideo =>
+        (AppColors.success, Icons.movie_filter_rounded),
+      VideoSource.webPage => (AppColors.warning, Icons.language_rounded),
+      VideoSource.unknown => (AppColors.textMuted, Icons.help_outline_rounded),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              source.playable
+                  ? '${source.label} — جاهز للتشغيل داخل الغرفة'
+                  : '${source.label} — سيُعرض داخل متصفح الغرفة',
+              style: TextStyle(
+                color: color,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hint(IconData icon, String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 8),
+            Text(text,
+                style: const TextStyle(
+                    color: AppColors.textMuted, fontSize: 12.5)),
+          ],
+        ),
+      );
+}
+
+class _QuickSitesRow extends StatelessWidget {
+  const _QuickSitesRow({required this.onSelect});
   final void Function(String url) onSelect;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: QuickSite.all
-          .map(
-            (site) => SizedBox(
-              width: 108,
-              child: Material(
-                color: AppColors.card,
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => onSelect(site.url),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: site.color.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(site.icon, color: site.color, size: 22),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          site.name,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: QuickSite.all.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final site = QuickSite.all[i];
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => onSelect(site.url),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(site.icon, size: 17, color: site.color),
+                  const SizedBox(width: 6),
+                  Text(
+                    site.name,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-          )
-          .toList(),
+          );
+        },
+      ),
     );
   }
 }

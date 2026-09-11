@@ -1,5 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/constants/app_constants.dart';
 import 'app_user.dart';
@@ -15,29 +15,26 @@ class AuthFailure implements Exception {
 class AuthRepository {
   AuthRepository({
     FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
+    FirebaseDatabase? database,
   })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+        _db = database ?? FirebaseDatabase.instance;
 
   final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final FirebaseDatabase _db;
 
   User? get currentUser => _auth.currentUser;
   String get uid => _auth.currentUser?.uid ?? '';
+
+  DatabaseReference get _users => _db.ref(AppConstants.usersCollection);
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
   Future<AppUser?> get currentUserProfile async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    final doc = await _users.doc(user.uid).get();
-    if (doc.exists) return AppUser.fromDoc(doc);
-    return AppUser(
-      uid: user.uid,
-      name: user.displayName ?? 'مشاهد',
-      email: user.email ?? '',
-      photoUrl: user.photoURL,
-    );
+    final snapshot = await _users.child(user.uid).get();
+    if (snapshot.exists) return AppUser.fromSnapshot(snapshot);
+    return AppUser.fromFirebase(user);
   }
 
   Future<UserCredential> signIn({
@@ -51,7 +48,7 @@ class AuthRepository {
       );
     } on FirebaseAuthException catch (e) {
       throw AuthFailure(_mapError(e.code));
-    } catch (e) {
+    } catch (_) {
       throw AuthFailure('تعذّر تسجيل الدخول. تحقق من اتصالك بالإنترنت.');
     }
   }
@@ -72,13 +69,14 @@ class AuthRepository {
         uid: credential.user!.uid,
         name: name.trim(),
         email: email.trim(),
-        createdAt: DateTime.now(),
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
       );
-      await _users.doc(credential.user!.uid).set(appUser.toMap());
+      await _users.child(credential.user!.uid).set(appUser.toMap()
+        ..['createdAt'] = ServerValue.timestamp);
       return credential;
     } on FirebaseAuthException catch (e) {
       throw AuthFailure(_mapError(e.code));
-    } catch (e) {
+    } catch (_) {
       throw AuthFailure('تعذّر إنشاء الحساب. حاول مرة أخرى.');
     }
   }
@@ -96,20 +94,14 @@ class AuthRepository {
     if (user == null) throw AuthFailure('المستخدم غير مسجل');
     try {
       await user.updateDisplayName(name.trim());
-      await _users.doc(user.uid).set(
-        {'name': name.trim()},
-        SetOptions(merge: true),
-      );
+      await _users.child(user.uid).update({'name': name.trim()});
       await user.reload();
-    } catch (e) {
+    } catch (_) {
       throw AuthFailure('تعذّر تحديث البيانات.');
     }
   }
 
   Future<void> signOut() => _auth.signOut();
-
-  CollectionReference<Map<String, dynamic>> get _users =>
-      _firestore.collection(AppConstants.usersCollection);
 
   String _mapError(String code) {
     switch (code) {

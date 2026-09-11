@@ -1,5 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class AppUser {
   const AppUser({
@@ -7,41 +7,33 @@ class AppUser {
     required this.name,
     required this.email,
     this.photoUrl,
-    this.createdAt,
+    this.createdAtMs,
   });
 
   final String uid;
   final String name;
   final String email;
   final String? photoUrl;
-  final DateTime? createdAt;
+  final int? createdAtMs;
 
-  factory AppUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    return AppUser(
-      uid: doc.id,
-      name: (data['name'] ?? 'مشاهد') as String,
-      email: (data['email'] ?? '') as String,
-      photoUrl: data['photoUrl'] as String?,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+  DateTime? get createdAt => createdAtMs == null
+      ? null
+      : DateTime.fromMillisecondsSinceEpoch(createdAtMs!);
+
+  factory AppUser.fromSnapshot(DataSnapshot snapshot) {
+    final data = Map<String, dynamic>.from(
+      (snapshot.value as Map?) ?? const {},
     );
+    return AppUser.fromMap(data, snapshot.key ?? '');
   }
 
-  factory AppUser.fromMap(Map<String, dynamic> data, String uid) => AppUser(
+  factory AppUser.fromMap(Map<dynamic, dynamic> data, String uid) => AppUser(
         uid: uid,
         name: (data['name'] ?? 'مشاهد') as String,
         email: (data['email'] ?? '') as String,
         photoUrl: data['photoUrl'] as String?,
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+        createdAtMs: (data['createdAt'] as num?)?.toInt(),
       );
-
-  Map<String, dynamic> toMap() => {
-        'name': name,
-        'email': email,
-        'photoUrl': photoUrl,
-        'createdAt':
-            createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
-      };
 
   factory AppUser.fromFirebase(User user) => AppUser(
         uid: user.uid,
@@ -52,11 +44,25 @@ class AppUser {
         photoUrl: user.photoURL,
       );
 
+  /// بيانات العضو داخل قائمة الحضور
+  Map<String, dynamic> toPresenceMap() => {
+        'name': name,
+        'email': email,
+        'photoUrl': photoUrl,
+      };
+
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'email': email,
+        'photoUrl': photoUrl,
+        'createdAt': createdAtMs,
+      };
+
   AppUser copyWith({String? name, String? photoUrl}) => AppUser(
         uid: uid,
         name: name ?? this.name,
         email: email,
         photoUrl: photoUrl ?? this.photoUrl,
-        createdAt: createdAt,
+        createdAtMs: createdAtMs,
       );
 }

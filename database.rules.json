@@ -1,0 +1,33 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "rooms": {
+      ".read": "auth != null",
+      ".indexOn": ["createdAt", "isLive", "participantCount"],
+
+      "$roomId": {
+        ".write": "auth != null",
+
+        "participants": {
+          ".write": "auth != null"
+        },
+
+        "messages": {
+          ".indexOn": ["createdAt"],
+          "$messageId": {
+            ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}

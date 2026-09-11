@@ -20,7 +20,7 @@
 ## ✨ المميزات
 
 - 🔐 **تسجيل حساب / دخول** عبر البريد وكلمة المرور (Firebase Authentication) مع استعادة كلمة المرور.
-- 🏠 **الصفحة الرئيسية**: عرض كل الغرف المنشأة لحظيًّا (Firestore) مع بحث وفلاتر (نشط الآن، يوتيوب، روابط مباشرة) وشبكة غرف بتصميم بطاقات احترافي.
+- 🏠 **الصفحة الرئيسية**: عرض كل الغرف المنشأة لحظيًّا (Realtime Database) مع بحث وفلاتر (نشط الآن، يوتيوب، روابط مباشرة) وشبكة غرف بتصميم بطاقات احترافي.
 - ➕ **إنشاء غرفة**: اسم الغرفة + رابط المشاهدة مع اكتشاف تلقائي لنوع المصدر، واختصارات لمواقع مشهورة (يوتيوب، جوجل، تيك توك، فيسبوك، إكس، إنستغرام...).
 - 🌐 **المتصفح الداخلي**:
   - يفتح أي موقع ويزود بشريط عنوان وأزرار تنقّل.
@@ -55,7 +55,7 @@ lib/
     └── settings/              # الإعدادات
 ```
 
-### مجموعات Firestore
+### هيكل Realtime Database
 
 ```
 users/{uid}
@@ -83,10 +83,10 @@ flutter pub get
 
 المتبقي فقط تفعيل الخدمات من <https://console.firebase.google.com/project/livematch-8e189>:
 1. فعّل **Authentication → Sign-in method → Email/Password**.
-2. فعّل **Cloud Firestore** (أنشئ قاعدة البيانات بوضع الإنتاج).
-3. الصق قواعد `firestore.rules` وانشرها:
+2. أنشئ **Realtime Database** (من القائمة الجانبية: Realtime Database → Create database).
+3. انشر قواعد الأمان من `database.rules.json`:
    ```bash
-   firebase deploy --only firestore:rules
+   firebase deploy --only database
    ```
 
 > لدعم iOS أو الويب: أضف التطبيق من Console ثم شغّل `flutterfire configure` لتعبئة القيم الناقصة في `lib/firebase_options.dart`.
@@ -102,7 +102,7 @@ flutter run -d chrome
 (المتصفح الداخلي متاح على الجوال؛ على الويب يُلصق الرابط يدويًّا).
 
 ## 🔌 أهم الحزم
-- `firebase_core`, `firebase_auth`, `cloud_firestore`
+- `firebase_core`, `firebase_auth`, `firebase_database`
 - `provider` لإدارة الحالة و`go_router` للتنقل
 - `webview_flutter` للمتصفح الداخلي
 - `youtube_player_iframe` لمشغّل يوتيوب
@@ -111,7 +111,7 @@ flutter run -d chrome
 
 ## 📝 ملاحظات
 - بعض المواقع تمنع تضمين فيديوهاتها أو تستخدم تشفير MSE (روابط `blob:`) فيتعذّر استخراج رابط مباشر منها؛ استخدم رابط يوتيوب أو الصفحة مباشرة (تُعرض داخل WebView).
-- عدّاد الحضور يُحدَّث عند الدخول/الخروج؛ يمكن تعزيزه لاحقًا بـ presence عبر Realtime Database.
+- الحضور لحظي عبر Realtime Database مع إزالة تلقائية عند انقطاع الاتصال (onDisconnect) ومزامنة زمن التشغيل وفق ساعة الخادم.
 - قبل النشر على المتاجر استبدل مفتاح توقيع الإصدار (release) في `android/app/build.gradle.kts`.
 
 استمتعوا بالمشاهدة الجماعية 🍿
