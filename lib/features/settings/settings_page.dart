@@ -76,9 +76,9 @@ class SettingsPage extends StatelessWidget {
             child: const Text('تراجع'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.live),
+            style: FilledButton.styleFrom(backgroundColor: context.mono),
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('خروج'),
+            child: Text('خروج', style: TextStyle(color: context.onMono)),
           ),
         ],
       ),
@@ -104,12 +104,8 @@ class SettingsPage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-                colors: [Color(0xFF241D3A), Color(0xFF14111D)],
-              ),
-              borderRadius: BorderRadius.circular(22),
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
@@ -322,9 +318,6 @@ class SettingsPage extends StatelessWidget {
           GradientButton(
             label: 'تسجيل الخروج',
             icon: Icons.logout_rounded,
-            gradient: const LinearGradient(
-              colors: [AppColors.live, Color(0xFFFF7A59)],
-            ),
             onPressed: () => _logout(context),
           ),
           const SizedBox(height: 16),

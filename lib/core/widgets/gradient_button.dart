@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// زر رئيسي بتدرج لوني سينمائي مع حالة تحميل
+/// الزر الرئيسي في التطبيق — صلب بلون التمييز (أبيض/أسود) بدون تدرجات.
+/// يبقى اسم GradientButton توافقيًّا مع الاستدعاءات الحالية.
 class GradientButton extends StatelessWidget {
   const GradientButton({
     super.key,
@@ -11,7 +12,7 @@ class GradientButton extends StatelessWidget {
     this.icon,
     this.loading = false,
     this.expand = true,
-    this.gradient = AppGradients.primary,
+    this.gradient,
   });
 
   final String label;
@@ -19,59 +20,60 @@ class GradientButton extends StatelessWidget {
   final IconData? icon;
   final bool loading;
   final bool expand;
-  final Gradient gradient;
+
+  /// تدرج مخصّص اختياري (يتجاوز النمط الأحادي إن مُرّر)
+  final Gradient? gradient;
 
   @override
   Widget build(BuildContext context) {
     final disabled = onPressed == null || loading;
+    final custom = gradient != null && !disabled;
+    final bg = custom ? null : (disabled ? context.variant : context.mono);
+    final fg = custom
+        ? Colors.white
+        : disabled
+            ? context.text3
+            : context.onMono;
+
     return Opacity(
-      opacity: disabled && !loading ? 0.5 : 1,
+      opacity: disabled && !loading ? 0.6 : 1,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: disabled ? null : onPressed,
           child: Ink(
             width: expand ? double.infinity : null,
-            height: 54,
+            height: 52,
             decoration: BoxDecoration(
-              gradient: disabled ? null : gradient,
-              color: disabled ? AppColors.surfaceVariant : null,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: disabled
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.35),
-                        blurRadius: 22,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+              color: bg,
+              gradient: custom ? gradient : null,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
               child: loading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.4,
-                        color: Colors.white,
+                        color: fg,
                       ),
                     )
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (icon != null) ...[
-                          Icon(icon, color: Colors.white, size: 20),
+                          Icon(icon, color: fg, size: 19),
                           const SizedBox(width: 8),
                         ],
                         Text(
                           label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                          style: TextStyle(
+                            color: fg,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -84,9 +86,9 @@ class GradientButton extends StatelessWidget {
   }
 }
 
-/// شعار التطبيق (مربع بتدرج لوني وأيقونة تشغيل)
+/// شعار التطبيق: مربع صلب بلون التمييز مع مثلّث تشغيل معكوس اللون
 class AppLogo extends StatelessWidget {
-  const AppLogo({super.key, this.size = 64, this.radius = 18});
+  const AppLogo({super.key, this.size = 64, this.radius = 16});
 
   final double size;
   final double radius;
@@ -97,19 +99,12 @@ class AppLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: AppGradients.primary,
+        color: context.mono,
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.4),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Icon(
         Icons.play_arrow_rounded,
-        color: Colors.white,
+        color: context.onMono,
         size: size * 0.62,
       ),
     );

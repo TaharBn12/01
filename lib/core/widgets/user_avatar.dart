@@ -23,7 +23,7 @@ class UserAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatar = CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.surfaceVariant,
+      backgroundColor: context.variant,
       backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
           ? CachedNetworkImageProvider(photoUrl!)
           : null,
@@ -31,9 +31,9 @@ class UserAvatar extends StatelessWidget {
           ? Text(
               Formatters.initials(name),
               style: TextStyle(
-                color: AppColors.primaryLight,
-                fontWeight: FontWeight.w700,
-                fontSize: radius * 0.72,
+                color: context.text1,
+                fontWeight: FontWeight.w800,
+                fontSize: radius * 0.7,
               ),
             )
           : null,
@@ -44,7 +44,7 @@ class UserAvatar extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: AppGradients.primary,
+        color: context.mono,
       ),
       child: avatar,
     );

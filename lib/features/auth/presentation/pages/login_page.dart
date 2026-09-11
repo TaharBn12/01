@@ -196,11 +196,11 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   TextButton(
                     onPressed: () => context.push('/register'),
-                    child: const Text(
+                    child: Text(
                       'أنشئ حسابًا جديدًا',
                       style: TextStyle(
-                        color: AppColors.primaryLight,
-                        fontWeight: FontWeight.w700,
+                        color: context.mono,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/gradient_button.dart';
@@ -83,10 +84,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'أنشئ حسابك المجاني وابدأ غرفة المشاهدة خلال ثوانٍ.',
-                  style:
-                      TextStyle(color: Color(0xFF7E7890), height: 1.7),
+                  style: TextStyle(color: context.text3, height: 1.7),
                 ),
                 const SizedBox(height: 26),
                 AppTextField(
@@ -137,7 +137,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   onChanged: (v) => setState(() => _agreed = v ?? false),
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: const Color(0xFF7C4DFF),
+                  activeColor: context.mono,
                   title: const Text(
                     'أوافق على شروط الاستخدام وسياسة الخصوصية',
                     style: TextStyle(fontSize: 13.5),
@@ -154,17 +154,17 @@ class _RegisterPageState extends State<RegisterPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'لديك حساب بالفعل؟',
-                      style: TextStyle(color: Color(0xFF7E7890)),
+                      style: TextStyle(color: context.text3),
                     ),
                     TextButton(
                       onPressed: () => context.pop(),
-                      child: const Text(
+                      child: Text(
                         'تسجيل الدخول',
                         style: TextStyle(
-                          color: Color(0xFFB388FF),
-                          fontWeight: FontWeight.w700,
+                          color: context.mono,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),

@@ -9,7 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/video_utils.dart';
 import '../../../core/widgets/feedback.dart';
-import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/gradient_button.dart' show AppLogo;
 import '../../../core/widgets/user_avatar.dart';
 import '../data/room_model.dart';
 import '../data/rooms_repository.dart';
@@ -47,9 +47,11 @@ class _HomePageState extends State<HomePage> {
         final q = _query.toLowerCase();
         final matchName = room.name.toLowerCase().contains(q);
         final matchHost = room.hostName.toLowerCase().contains(q);
-        final matchCode = room.id.toLowerCase() == q ||
-            room.id.toLowerCase().contains(q);
-        if (!matchName && !matchHost && !matchCode) return false;
+        final matchTitle = (room.videoTitle ?? '').toLowerCase().contains(q);
+        final matchCode = room.id.toLowerCase().contains(q);
+        if (!matchName && !matchHost && !matchTitle && !matchCode) {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -88,11 +90,11 @@ class _HomePageState extends State<HomePage> {
     final code = await showDialog<String>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.login_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('الدخول بكود الغرفة'),
+            Icon(Icons.login_rounded, color: dialogCtx.mono),
+            const SizedBox(width: 8),
+            const Text('الدخول بكود الغرفة'),
           ],
         ),
         content: TextField(
@@ -102,14 +104,11 @@ class _HomePageState extends State<HomePage> {
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 22,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
             letterSpacing: 4,
           ),
           maxLength: 6,
-          decoration: const InputDecoration(
-            hintText: 'ABC-123',
-            counterText: '',
-          ),
+          decoration: const InputDecoration(hintText: 'ABC-123', counterText: ''),
           onSubmitted: (v) => Navigator.pop(dialogCtx, v),
         ),
         actions: [
@@ -146,25 +145,26 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/room/new'),
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        icon: const Icon(Icons.add_rounded),
         label: const Text(
-          'إنشاء غرفة',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-          ),
+          'غرفة جديدة',
+          style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        backgroundColor: AppColors.primary,
       ),
       body: SafeArea(
         child: StreamBuilder<List<RoomModel>>(
           stream: _rooms,
           builder: (context, snapshot) {
+            final all = snapshot.data ?? const [];
+            final rooms = _apply(all);
+            final liveCount = all.where((r) => r.isLive).length;
+
             return RefreshIndicator(
-              color: AppColors.primary,
+              color: context.mono,
+              backgroundColor: context.cardColor,
               onRefresh: () async {
                 setState(() {});
-                await Future.delayed(const Duration(milliseconds: 600));
+                await Future.delayed(const Duration(milliseconds: 500));
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -178,42 +178,55 @@ class _HomePageState extends State<HomePage> {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                      child: TextField(
-                        onChanged: (v) => setState(() => _query = v),
-                        decoration: InputDecoration(
-                          hintText:
-                              'ابحث عن غرفة بالاسم أو المضيف أو الكود...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: true,
-                          suffixIcon: _query.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.close_rounded),
-                                  onPressed: () => setState(() {
-                                    _query = '';
-                                  }),
-                                ),
-                        ),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      child: _SectionTitle(
+                        liveCount: liveCount,
+                        total: all.length,
                       ),
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 44,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _SearchField(
+                        value: _query,
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                      child: Row(
                         children: [
-                          _chip('الكل', _Filter.all),
-                          _chip('نشط الآن', _Filter.live),
-                          _chip('يوتيوب', _Filter.youtube),
-                          _chip('روابط مباشرة', _Filter.direct),
+                          _FilterPill(
+                            label: 'الكل',
+                            selected: _filter == _Filter.all,
+                            onTap: () =>
+                                setState(() => _filter = _Filter.all),
+                          ),
+                          _FilterPill(
+                            label: 'مباشر',
+                            selected: _filter == _Filter.live,
+                            onTap: () =>
+                                setState(() => _filter = _Filter.live),
+                          ),
+                          _FilterPill(
+                            label: 'يوتيوب',
+                            selected: _filter == _Filter.youtube,
+                            onTap: () =>
+                                setState(() => _filter = _Filter.youtube),
+                          ),
+                          _FilterPill(
+                            label: 'مباشر (رابط)',
+                            selected: _filter == _Filter.direct,
+                            onTap: () =>
+                                setState(() => _filter = _Filter.direct),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData)
                     const SliverFillRemaining(
@@ -228,9 +241,23 @@ class _HomePageState extends State<HomePage> {
                         onRetry: () => setState(() {}),
                       ),
                     )
+                  else if (rooms.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _emptyState(context),
+                    )
                   else
-                    _roomsSliver(snapshot.data ?? []),
-                  const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                    SliverPadding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 110),
+                      sliver: SliverList.builder(
+                        itemCount: rooms.length,
+                        itemBuilder: (context, i) => RoomCard(
+                          room: rooms[i],
+                          onTap:
+                              _joining ? () {} : () => _openRoom(rooms[i]),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -240,76 +267,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _roomsSliver(List<RoomModel> all) {
-    final rooms = _apply(all);
-    if (rooms.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: EmptyState(
-          icon: _query.isNotEmpty
-              ? Icons.search_off_rounded
-              : Icons.live_tv_rounded,
-          title: _query.isNotEmpty ? 'لا نتائج مطابقة' : 'لا توجد غرف بعد',
-          message: _query.isNotEmpty
-              ? 'جرّب كلمة بحث مختلفة أو تصفية أخرى.'
-              : 'كن أول من يبدأ جلسة مشاهدة جماعية!\n'
-                  'أنشئ غرفة، أضف رابط الفيديو، وادعُ أصدقاءك بالكود.',
-          action: _query.isNotEmpty
-              ? null
-              : SizedBox(
-                  width: 220,
-                  child: GradientButton(
-                    label: 'إنشاء أول غرفة',
-                    icon: Icons.add_rounded,
-                    onPressed: () => context.push('/room/new'),
-                  ),
-                ),
-        ),
-      );
-    }
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverLayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.crossAxisExtent;
-          final columns = (width / 340).floor().clamp(1, 4).toInt();
-          return SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 0.92,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, i) => RoomCard(
-                room: rooms[i],
-                onTap: _joining ? () {} : () => _openRoom(rooms[i]),
+  Widget _emptyState(BuildContext context) {
+    final searching = _query.isNotEmpty || _filter != _Filter.all;
+    return EmptyState(
+      icon: searching ? Icons.search_off_rounded : Icons.live_tv_rounded,
+      title: searching ? 'لا نتائج مطابقة' : 'لا توجد غرف بعد',
+      message: searching
+          ? 'جرّب كلمة بحث مختلفة أو تصفية أخرى.'
+          : 'كن أول من يبدأ جلسة مشاهدة جماعية.\n'
+              'أنشئ غرفة، التقط رابط الفيديو، وادعُ أصدقاءك بالكود.',
+      action: searching
+          ? null
+          : SizedBox(
+              width: 220,
+              child: FilledButton.icon(
+                onPressed: () => context.push('/room/new'),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('إنشاء أول غرفة'),
               ),
-              childCount: rooms.length,
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _chip(String label, _Filter value) {
-    final selected = _filter == value;
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => setState(() => _filter = value),
-        selectedColor: AppColors.primary.withValues(alpha: 0.25),
-        labelStyle: TextStyle(
-          color: selected ? AppColors.primaryLight : AppColors.textSecondary,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
     );
   }
 }
+
+// ===================================================================
 
 class _Header extends StatelessWidget {
   const _Header({
@@ -324,96 +305,210 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.primary.withValues(alpha: 0.22),
-            AppColors.background,
-          ],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 6),
+      child: Row(
         children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => context.push('/settings'),
-                child: UserAvatar(name: name, photoUrl: photoUrl, radius: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${Formatters.greeting()} 👋',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'الدخول بكود غرفة',
-                onPressed: onJoinCode,
-                icon: const Icon(Icons.key_rounded),
-              ),
-              IconButton(
-                tooltip: 'الإعدادات',
-                onPressed: () => context.push('/settings'),
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ],
+          GestureDetector(
+            onTap: () => context.push('/settings'),
+            child: UserAvatar(name: name, photoUrl: photoUrl, radius: 22),
           ),
-          const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const AppLogo(size: 46, radius: 14),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      AppConstants.appName,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      AppConstants.appTagline,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textMuted.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Formatters.greeting(),
+                  style: TextStyle(
+                    color: context.text3,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: context.text1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _CircleButton(
+            icon: Icons.key_rounded,
+            tooltip: 'الدخول بكود غرفة',
+            onTap: onJoinCode,
+          ),
+          _CircleButton(
+            icon: Icons.settings_outlined,
+            tooltip: 'الإعدادات',
+            onTap: () => context.push('/settings'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Icon(icon, size: 20),
+      style: IconButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: context.line),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.liveCount, required this.total});
+
+  final int liveCount;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          AppConstants.appName,
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            color: context.text1,
+            letterSpacing: -0.5,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(width: 10),
+        const AppLogo(size: 30, radius: 9),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: context.variant,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.line),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: liveCount > 0 ? context.mono : context.text3,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$liveCount مباشر',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: context.text2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.value, required this.onChanged});
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: TextField(
+        onChanged: onChanged,
+        style: TextStyle(fontSize: 13.5, color: context.text1),
+        decoration: InputDecoration(
+          hintText: 'ابحث عن غرفة أو عنوان فيديو أو مضيف أو كود...',
+          hintStyle: TextStyle(fontSize: 12.5, color: context.text3),
+          prefixIcon: Icon(Icons.search_rounded, size: 20, color: context.text3),
+          filled: true,
+          fillColor: context.variant,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          suffixIcon: value.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () => onChanged(''),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? context.mono : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? context.mono : context.line,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: selected ? context.onMono : context.text2,
+            ),
+          ),
+        ),
       ),
     );
   }

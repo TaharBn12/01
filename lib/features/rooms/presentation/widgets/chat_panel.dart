@@ -145,15 +145,15 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
                 const SizedBox(width: 8),
                 Material(
-                  color: AppColors.primary,
+                  color: context.mono,
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: _sending ? null : _send,
-                    child: const Padding(
-                      padding: EdgeInsets.all(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
                       child: Icon(Icons.send_rounded,
-                          color: Colors.white, size: 22),
+                          color: context.onMono, size: 20),
                     ),
                   ),
                 ),
@@ -200,10 +200,10 @@ class _MessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 3, right: 4),
                     child: Text(
                       message.senderName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primaryLight,
+                        color: context.text2,
                       ),
                     ),
                   ),
@@ -211,8 +211,7 @@ class _MessageBubble extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    gradient: mine ? AppGradients.primary : null,
-                    color: mine ? null : AppColors.surfaceVariant,
+                    color: mine ? context.mono : context.variant,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -231,7 +230,7 @@ class _MessageBubble extends StatelessWidget {
                       Text(
                         message.text,
                         style: TextStyle(
-                          color: mine ? Colors.white : AppColors.textPrimary,
+                          color: mine ? context.onMono : context.text1,
                           fontSize: 14,
                           height: 1.5,
                         ),
@@ -244,8 +243,8 @@ class _MessageBubble extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 9.5,
                           color: mine
-                              ? Colors.white70
-                              : AppColors.textMuted,
+                              ? context.onMono.withValues(alpha: 0.65)
+                              : context.text3,
                         ),
                       ),
                     ],

@@ -1,18 +1,21 @@
+import 'dart:convert';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show Factory, kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/media_capture.dart';
 import '../../../core/utils/video_utils.dart';
+import '../../../core/widgets/gradient_button.dart';
 
 /// المتصفح الداخلي:
-/// - يفتح المواقع الشهيرة (يوتيوب، جوجل...).
-/// - يحقن سكربت مراقبة يلتقط رابط الفيديو المباشر (mp4/m3u8...)
-///   فور تشغيل أي فيديو HTML5 داخل الصفحة.
-/// - يميّز روابط يوتيوب ويعرض زرًّا مباشرًّا لاستخدامها.
+/// - يحظر الإعلانات والنوافذ المنبثقة ومتتبّعات الإشهار على مستوى الصفحة.
+/// - يلتقط رابط الفيديو (mp4/m3u8/youtube) فور تشغيله مع عنوان الصفحة.
+/// - يعرض زرًّا عائمًا عند الالتقاط؛ بالضغط عليه تظهر بطاقة الفيديو وعنوانه.
 class BrowserPage extends StatefulWidget {
   const BrowserPage({super.key, this.initialUrl});
 
@@ -29,22 +32,172 @@ class _BrowserPageState extends State<BrowserPage> {
   final TextEditingController _urlBarCtrl = TextEditingController();
 
   String _currentUrl = _home;
-  String? _detectedMediaUrl;
+  String? _pageTitle;
+  MediaCapture? _capture;
   bool _loading = true;
   int _loadingProgress = 0;
   bool _canGoBack = false;
   bool _canGoForward = false;
 
-  /// سكربت مراقبة وسائط HTML5 داخل الصفحة
+  // ============================ حظر الإعلانات ============================
+
+  static const String _adBlockScript = r'''
+(function () {
+  var AD_DOMAINS = new RegExp(
+    'doubleclick|googlesyndication|googleadservices|googletagservices|'
+    + 'google-analytics|googletag|adsystem|adservice|adnxs|adtech|'
+    + 'adsterra|popads|popcash|propellerads|propeller|adsafeprotected|'
+    + 'moatads|scorecardresearch|quantserve|rubiconproject|casalemedia|'
+    + 'criteo|outbrain|taboola|zedo|smartadserver|yieldmo|pubmatic|'
+    + 'openx\\.net|bidswitch|teads|mgid|adroll|clicksor|exoclick|'
+    + 'juicyads|hilltopads|adskeeper|trafficstars|onclk|clickadu|adcash|'
+    + 'adcolony|applovin|unityads|revcontent|adnow|aniview|adsupply|'
+    + 'popunder|adsystem|yieldlab|adform|advertising\\.com|/ads/|_ads_|'
+    + 'ads-banner|adserver|google_ad|adsbygoogle',
+    'i'
+  );
+  function isAd(u) { return typeof u === 'string' && AD_DOMAINS.test(u); }
+
+  // 1) إخفاء عناصر الإعلانات الشائعة بالـ CSS (تُحقن مرة واحدة)
+  if (!window.__cinemaAdCss) {
+  window.__cinemaAdCss = true;
+  var css = ''
+    + '[id^="ad-"],[id$="-ad"],[id^="ads-"],[id^="google_ads"],'
+    + '[id="ad"],[id="ads"],[class="ad"],[class="ads"],'
+    + '[class*="ad-banner"],[class*="ad_container"],[class*="ad-container"],'
+    + '[class*="ad-wrapper"],[class*="adsbox"],[class*="ads-box"],'
+    + '[class*="banner-ad"],[class*="BannerAd"],[class*="advertisement"],'
+    + 'ins.adsbygoogle,iframe[src*="doubleclick"],iframe[src*="googlesyndication"],'
+    + 'iframe[src*="adsterra"],iframe[src*="popads"],iframe[src*="propeller"],'
+    + 'iframe[src*="adnxs"],iframe[src*="adsystem"],iframe[src*="adservice"],'
+    + 'iframe[src*="clickadu"],iframe[src*="adcash"],[id*="google_ads"],'
+    + '[class*="GoogleActiveView"],[class*="sponsored-ad"]{display:none!important;visibility:hidden!important;}';
+  try {
+    var st = document.createElement('style');
+    st.setAttribute('type', 'text/css');
+    st.textContent = css;
+    (document.head || document.documentElement).appendChild(st);
+  } catch (e) {}
+  }
+
+  // 2) منع النوافذ المنبثقة (popups / popunders)
+  if (!window.__cinemaPopups) {
+  window.__cinemaPopups = true;
+  try {
+    window.open = function () { return null; };
+    window.__defineSetter__ && window.__defineSetter__('opener', function () {});
+  } catch (e) {}
+  }
+
+  // 3) اعتراض طلبات الإعلانات في XHR / fetch
+  if (!window.__cinemaNet) {
+  window.__cinemaNet = true;
+  try {
+    var origOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      if (isAd(String(url))) { this.abort(); return; }
+      return origOpen.apply(this, arguments);
+    };
+  } catch (e) {}
+  try {
+    if (window.fetch) {
+      var origFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var u = (typeof input === 'string') ? input
+          : (input && input.url) || '';
+        if (isAd(u)) return Promise.reject(new Error('blocked'));
+        return origFetch.apply(this, arguments);
+      };
+    }
+  } catch (e) {}
+  }
+
+  // 4) اعتراض مصادر iframe / script / embed الإعلانية (مرة واحدة)
+  if (!window.__cinemaSrc) {
+  window.__cinemaSrc = true;
+  ['HTMLIFrameElement', 'HTMLScriptElement', 'HTMLEmbedElement', 'HTMLObjectElement']
+    .forEach(function (name) {
+      var ctor = window[name];
+      if (!ctor || !ctor.prototype) return;
+      var desc = Object.getOwnPropertyDescriptor(ctor.prototype, 'src');
+      if (!desc || !desc.set) return;
+      try {
+        Object.defineProperty(ctor.prototype, 'src', {
+          configurable: true,
+          enumerable: desc.enumerable,
+          get: function () { return desc.get ? desc.get.call(this) : ''; },
+          set: function (v) {
+            if (!isAd(String(v))) desc.set.call(this, v);
+          }
+        });
+      } catch (e) {}
+    });
+  }
+
+  // 5) إزالة عناصر الإعلانات التي تُحقن ديناميكيًّا
+  function sweep(root) {
+    try {
+      var nodes = (root || document).querySelectorAll &&
+        (root || document).querySelectorAll(
+          'iframe,ins,div,section,[id],[class]'
+        );
+      if (!nodes) return;
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        var src = n.src || n.getAttribute && n.getAttribute('src') || '';
+        var cls = ((n.id || '') + ' ' + (n.className || '')).toString();
+        if (isAd(src) || /(^|[-\s_])(ad|ads|advert|sponsored)([-\s_]|$)/i.test(cls)) {
+          if (n.remove) n.remove();
+          else if (n.parentNode) n.parentNode.removeChild(n);
+        }
+      }
+    } catch (e) {}
+  }
+  if (document.documentElement && !window.__cinemaMO) {
+    try {
+      window.__cinemaMO = true;
+      var mo = new MutationObserver(function (muts) {
+        for (var m = 0; m < muts.length; m++) {
+          var added = muts[m].addedNodes;
+          for (var i = 0; i < added.length; i++) {
+            if (added[i].nodeType === 1) sweep(added[i]);
+          }
+        }
+      });
+      mo.observe(document.documentElement,
+        { childList: true, subtree: true });
+    } catch (e) { window.__cinemaMO = false; }
+  }
+  if (!window.__cinemaSweep) {
+    window.__cinemaSweep = true;
+    setInterval(sweep, 2500);
+  }
+})();
+''';
+
+  // ========================= التقاط الفيديو =========================
+
   static const String _detectorScript = r'''
 (function () {
   if (window.__cinemaDetector) return;
   window.__cinemaDetector = true;
-  var mediaPattern = /\.(mp4|m3u8|webm|ogv|ogg|mov|m4v|ts)(\?|#|$)/i;
+
+  var AD_DOMAINS = /doubleclick|googlesyndication|googleadservices|adnxs|adsterra|popads|propeller|adsystem|adservice|clickadu|adcash|adskeeper|moatads|smartadserver|pubmatic|rubiconproject|casalemedia|yieldmo|aniview/i;
+  var mediaPattern = /\.(mp4|m3u8|webm|ogv|ogg|mov|m4v|ts|mpd)(\?|#|$)/i;
+
+  function pageTitle() {
+    var og = document.querySelector('meta[property="og:title"]');
+    if (og && og.content) return og.content;
+    var tw = document.querySelector('meta[name="twitter:title"]');
+    if (tw && tw.content) return tw.content;
+    return document.title || '';
+  }
   function report(url) {
     if (!url) return;
     if (url.indexOf('blob:') === 0) return;
-    try { window.VideoDetector.postMessage(url); } catch (e) {}
+    if (AD_DOMAINS.test(url)) return;
+    var payload = JSON.stringify({ url: url, title: pageTitle() });
+    try { window.VideoDetector.postMessage(payload); } catch (e) {}
   }
   function scanVideoTags() {
     var vids = document.querySelectorAll('video');
@@ -67,18 +220,19 @@ class _BrowserPageState extends State<BrowserPage> {
   document.addEventListener('play', function (e) {
     if (e.target && e.target.tagName === 'VIDEO') {
       scanVideoTags();
-      setTimeout(scanResources, 1200);
+      setTimeout(function () { scanVideoTags(); scanResources(); }, 1200);
     }
   }, true);
-  setInterval(function () { scanVideoTags(); scanResources(); }, 3000);
+  // التقاط أوّلي شامل عند الجاهزية
+  setTimeout(function () { scanVideoTags(); scanResources(); }, 800);
+  setInterval(function () { scanVideoTags(); scanResources(); }, 3500);
 })();
 ''';
 
   @override
   void initState() {
     super.initState();
-    final start =
-        VideoUrlNormalizer.normalize(widget.initialUrl ?? _home);
+    final start = VideoUrlNormalizer.normalize(widget.initialUrl ?? _home);
     _currentUrl = start;
     _urlBarCtrl.text = start;
 
@@ -86,25 +240,25 @@ class _BrowserPageState extends State<BrowserPage> {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setUserAgent(
-          // وكيل جوال لتجربة موقع خفيف غالبًا ما يعرض مشغّل HTML5
           'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
           '(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36',
         )
         ..addJavaScriptChannel(
           'VideoDetector',
-          onMessageReceived: (JavaScriptMessage message) {
-            _onMediaDetected(message.message);
-          },
+          onMessageReceived: (JavaScriptMessage message) =>
+              _onMediaMessage(message.message),
         )
         ..setNavigationDelegate(
           NavigationDelegate(
-            onPageStarted: (url) {
+            onPageStarted: (url) async {
               setState(() {
                 _loading = true;
                 _currentUrl = url;
                 _urlBarCtrl.text = url;
-                _detectedMediaUrl = null;
+                _capture = null;
+                _pageTitle = null;
               });
+              await _controller?.runJavaScript(_adBlockScript);
             },
             onProgress: (p) {
               setState(() => _loadingProgress = p);
@@ -116,9 +270,16 @@ class _BrowserPageState extends State<BrowserPage> {
                 _currentUrl = url;
                 _urlBarCtrl.text = url;
               });
+              await _controller?.runJavaScript(_adBlockScript);
               await _controller?.runJavaScript(_detectorScript);
+              await _readPageTitle();
               await _updateNavFlags();
               _checkYouTube(url);
+              // حقنة إضافية بعد تحميل المحتوى الديناميكي
+              Future.delayed(const Duration(seconds: 2), () async {
+                await _controller?.runJavaScript(_adBlockScript);
+                await _controller?.runJavaScript(_detectorScript);
+              });
             },
             onUrlChange: (change) {
               final url = change.url ?? '';
@@ -127,13 +288,32 @@ class _BrowserPageState extends State<BrowserPage> {
               _urlBarCtrl.text = url;
               _checkYouTube(url);
             },
-            onWebResourceError: (error) {
-              // نتجاهل أخطاء الموارد الفرعية
-            },
+            onWebResourceError: (_) {},
           ),
         )
         ..loadRequest(Uri.parse(start));
     }
+  }
+
+  Future<void> _readPageTitle() async {
+    try {
+      final raw =
+          await _controller?.runJavaScriptReturningResult('document.title');
+      var title = raw?.toString();
+      // بعض المنصات تُرجع النص بين علامتي اقتباس
+      if (title != null &&
+          title.length >= 2 &&
+          title.startsWith('"') &&
+          title.endsWith('"')) {
+        try {
+          title = jsonDecode(title) as String?;
+        } catch (_) {}
+      }
+      if (title != null && title.isNotEmpty && title != 'null') {
+        final clean = MediaCapture.normalizeTitle(title);
+        if (clean != null && mounted) setState(() => _pageTitle = clean);
+      }
+    } catch (_) {}
   }
 
   Future<void> _updateNavFlags() async {
@@ -150,20 +330,48 @@ class _BrowserPageState extends State<BrowserPage> {
   }
 
   void _checkYouTube(String url) {
-    if (VideoUtils.extractYouTubeId(url) != null &&
-        (_detectedMediaUrl == null)) {
-      setState(() => _detectedMediaUrl = url);
+    if (VideoUtils.extractYouTubeId(url) != null) {
+      _acceptCapture(MediaCapture(url: url, title: _pageTitle), priority: 2);
     }
   }
 
-  void _onMediaDetected(String url) {
-    if (url.isEmpty) return;
-    // نلتقط أول رابط وسائط صالح؛ الروابط اللاحقة تحدّث إن كانت أفضل
-    final current = _detectedMediaUrl;
-    final isDirect = VideoUtils.isDirectVideo(url);
-    if (current == null ||
-        (isDirect && !VideoUtils.isDirectVideo(current))) {
-      setState(() => _detectedMediaUrl = url);
+  void _onMediaMessage(String raw) {
+    if (raw.isEmpty) return;
+    String url = raw;
+    String? title;
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      url = data['url']?.toString() ?? raw;
+      title = data['title']?.toString();
+    } catch (_) {
+      // رسالة بصيغة رابط مباشر قديمة
+    }
+    final info = VideoUtils.inspect(url);
+    final priority = info.source == VideoSource.directVideo ? 3 : 1;
+    _acceptCapture(
+      MediaCapture(
+        url: url,
+        title: MediaCapture.normalizeTitle(title) ?? _pageTitle,
+      ),
+      priority: priority,
+    );
+  }
+
+  void _acceptCapture(MediaCapture capture, {required int priority}) {
+    final current = _capture;
+    final currentPriority = current == null
+        ? 0
+        : VideoUtils.inspect(current.url).source == VideoSource.directVideo
+            ? 3
+            : VideoUtils.isYouTube(current.url)
+                ? 2
+                : 1;
+    if (current == null || priority > currentPriority) {
+      setState(() => _capture = capture);
+    } else if (current.title == null && capture.title != null) {
+      setState(
+        () => _capture = MediaCapture(url: current.url, title: capture.title),
+      );
     }
   }
 
@@ -174,22 +382,33 @@ class _BrowserPageState extends State<BrowserPage> {
       if (url.contains('.') && !url.contains(' ')) {
         url = 'https://$url';
       } else {
-        url =
-            'https://www.google.com/search?q=${Uri.encodeQueryComponent(url)}';
+        url = 'https://www.google.com/search?q=${Uri.encodeQueryComponent(url)}';
       }
     }
     FocusScope.of(context).unfocus();
-    setState(() => _detectedMediaUrl = null);
+    setState(() => _capture = null);
     await _controller?.loadRequest(Uri.parse(url));
   }
 
-  void _useDetectedLink() {
-    final url = _detectedMediaUrl;
-    if (url != null && url.isNotEmpty) {
-      context.pop(url);
-    } else {
-      context.pop(_currentUrl);
-    }
+  /// زر شريط الأدوات: استخدام رابط الصفحة الحالية حتى دون التقاط فيديو
+  void _useCurrentPage() {
+    context.pop(
+      MediaCapture(
+        url: _currentUrl,
+        title: MediaCapture.normalizeTitle(_pageTitle),
+      ),
+    );
+  }
+
+  Future<void> _openCaptureSheet() async {
+    final capture = _capture;
+    if (capture == null) return;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => _CaptureSheet(capture: capture),
+    );
+    if (confirmed == true && mounted) context.pop(capture);
   }
 
   @override
@@ -210,32 +429,26 @@ class _BrowserPageState extends State<BrowserPage> {
       );
     }
 
-    final detected = _detectedMediaUrl;
-    final detectedInfo =
-        detected != null ? VideoUtils.inspect(detected) : null;
-
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 8,
+        toolbarHeight: 64,
+        titleSpacing: 4,
         title: Row(
           children: [
-            IconButton(
-              tooltip: 'رجوع',
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              onPressed:
-                  _canGoBack ? () => _controller?.goBack() : null,
+            _NavIcon(
+              icon: Icons.arrow_back_ios_new_rounded,
+              onTap: _canGoBack ? () => _controller?.goBack() : null,
             ),
-            IconButton(
-              tooltip: 'أمام',
-              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
-              onPressed:
+            _NavIcon(
+              icon: Icons.arrow_forward_ios_rounded,
+              onTap:
                   _canGoForward ? () => _controller?.goForward() : null,
             ),
-            IconButton(
-              tooltip: 'إعادة تحميل',
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              onPressed: () => _controller?.reload(),
+            _NavIcon(
+              icon: Icons.refresh_rounded,
+              onTap: () => _controller?.reload(),
             ),
+            const SizedBox(width: 4),
             Expanded(
               child: SizedBox(
                 height: 40,
@@ -243,35 +456,37 @@ class _BrowserPageState extends State<BrowserPage> {
                   controller: _urlBarCtrl,
                   textInputAction: TextInputAction.go,
                   onSubmitted: _navigate,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary),
+                  style: TextStyle(fontSize: 12.5, color: context.text1),
                   decoration: InputDecoration(
-                    hintText: 'ابحث أو اكتب رابطًا...',
-                    hintStyle:
-                        const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    hintText: 'ابحث أو الصق رابطًا...',
+                    hintStyle: TextStyle(fontSize: 12, color: context.text3),
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 12),
+                    isDense: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.border),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: context.mono, width: 1.4),
                     ),
                     filled: true,
-                    fillColor: AppColors.surfaceVariant,
-                    prefixIcon: const Icon(Icons.lock_outline_rounded,
-                        size: 14),
+                    fillColor: context.variant,
+                    prefixIcon: Icon(Icons.lock_outline_rounded,
+                        size: 13, color: context.text3),
                   ),
                 ),
               ),
             ),
-            IconButton(
-              tooltip: 'استخدام رابط الصفحة الحالية',
-              icon: const Icon(Icons.check_circle_outline_rounded,
-                  color: AppColors.primaryLight),
-              onPressed: _useDetectedLink,
+            _NavIcon(
+              icon: Icons.check_rounded,
+              onTap: _useCurrentPage,
+              foreground: context.mono,
             ),
           ],
         ),
@@ -282,188 +497,258 @@ class _BrowserPageState extends State<BrowserPage> {
                   value: _loadingProgress > 0 ? _loadingProgress / 100 : null,
                   minHeight: 2,
                   backgroundColor: Colors.transparent,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  valueColor: AlwaysStoppedAnimation(context.mono),
                 ),
               )
             : null,
       ),
-      body: Column(
-        children: [
-          _QuickLinksBar(onTap: (site) => _navigate(site.url)),
-          Expanded(
-            child: _controller == null
-                ? const SizedBox.shrink()
-                : WebViewWidget(
-                    controller: _controller!,
-                    gestureRecognizers: {
-                      Factory<OneSequenceGestureRecognizer>(
-                        () => EagerGestureRecognizer(),
-                      ),
-                    },
-                  ),
-          ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            transitionBuilder: (child, anim) => SizeTransition(
-              sizeFactor: anim,
-              child: FadeTransition(opacity: anim, child: child),
-            ),
-            child: detected == null
-                ? const SizedBox.shrink(key: ValueKey('none'))
-                : _DetectedBanner(
-                    key: const ValueKey('detected'),
-                    url: detected,
-                    isYoutube: detectedInfo?.source == VideoSource.youtube,
-                    isDirect: detectedInfo?.source == VideoSource.directVideo,
-                    onUse: _useDetectedLink,
-                    onDismiss: () =>
-                        setState(() => _detectedMediaUrl = null),
-                  ),
-          ),
-        ],
+      floatingActionButton: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 320),
+        transitionBuilder: (child, anim) =>
+            ScaleTransition(scale: anim, child: child),
+        child: _capture == null
+            ? const SizedBox.shrink(key: ValueKey('no-capture'))
+            : _CaptureFab(
+                key: const ValueKey('capture'),
+                source: VideoUtils.inspect(_capture!.url).source,
+                onTap: _openCaptureSheet,
+              ),
       ),
+      body: _controller == null
+          ? const SizedBox.shrink()
+          : WebViewWidget(
+              controller: _controller!,
+              gestureRecognizers: {
+                Factory<OneSequenceGestureRecognizer>(
+                  () => EagerGestureRecognizer(),
+                ),
+              },
+            ),
     );
   }
 }
 
-class _QuickLinksBar extends StatelessWidget {
-  const _QuickLinksBar({required this.onTap});
-  final void Function(QuickSite site) onTap;
+// ===================================================================
+
+class _NavIcon extends StatelessWidget {
+  const _NavIcon({required this.icon, required this.onTap, this.foreground});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color? foreground;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: QuickSite.all.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final site = QuickSite.all[i];
-          return ActionChip(
-            avatar: Icon(site.icon, size: 15, color: site.color),
-            label: Text(site.name),
-            onPressed: () => onTap(site),
+    final color = onTap == null
+        ? context.text3.withValues(alpha: 0.35)
+        : (foreground ?? context.text1);
+    return IconButton(
+      iconSize: 19,
+      visualDensity: VisualDensity.compact,
+      splashRadius: 20,
+      icon: Icon(icon, color: color),
+      onPressed: onTap,
+    );
+  }
+}
+
+/// الزر العائم الذي يظهر عند التقاط فيديو
+class _CaptureFab extends StatefulWidget {
+  const _CaptureFab({super.key, required this.source, required this.onTap});
+
+  final VideoSource source;
+  final VoidCallback onTap;
+
+  @override
+  State<_CaptureFab> createState() => _CaptureFabState();
+}
+
+class _CaptureFabState extends State<_CaptureFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (widget.source) {
+      VideoSource.youtube => Icons.smart_display_rounded,
+      VideoSource.directVideo => Icons.movie_rounded,
+      _ => Icons.language_rounded,
+    };
+    return InkWell(
+      borderRadius: BorderRadius.circular(30),
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: context.mono
+                      .withValues(alpha: 0.12 + _c.value * 0.22),
+                  blurRadius: 18 + _c.value * 10,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: child,
           );
         },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          decoration: BoxDecoration(
+            color: context.mono,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: context.onMono, size: 21),
+              const SizedBox(width: 8),
+              Text(
+                'تم التقاط فيديو',
+                style: TextStyle(
+                  color: context.onMono,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_upward_rounded,
+                  color: context.onMono, size: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _DetectedBanner extends StatelessWidget {
-  const _DetectedBanner({
-    super.key,
-    required this.url,
-    required this.isYoutube,
-    required this.isDirect,
-    required this.onUse,
-    required this.onDismiss,
-  });
+/// بطاقة تأكيد الالتقاط: تعرض المعاينة وعنوان الفيديو والرابط
+class _CaptureSheet extends StatelessWidget {
+  const _CaptureSheet({required this.capture});
 
-  final String url;
-  final bool isYoutube;
-  final bool isDirect;
-  final VoidCallback onUse;
-  final VoidCallback onDismiss;
+  final MediaCapture capture;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = isYoutube
-        ? AppColors.youtube
-        : isDirect
-            ? AppColors.success
-            : AppColors.primary;
-    final IconData icon = isYoutube
-        ? Icons.smart_display_rounded
-        : isDirect
-            ? Icons.movie_rounded
-            : Icons.language_rounded;
-    final title = isYoutube
-        ? 'تم العثور على فيديو يوتيوب'
-        : isDirect
-            ? 'تم التقاط رابط فيديو مباشر 🎯'
-            : 'رابط الصفحة الحالية جاهز';
+    final info = VideoUtils.inspect(capture.url);
+    final icon = switch (info.source) {
+      VideoSource.youtube => Icons.smart_display_rounded,
+      VideoSource.directVideo => Icons.movie_rounded,
+      VideoSource.webPage => Icons.language_rounded,
+      VideoSource.unknown => Icons.help_outline_rounded,
+    };
+    final title = MediaCapture.normalizeTitle(capture.title) ??
+        (info.source == VideoSource.youtube
+            ? 'فيديو يوتيوب'
+            : 'فيديو من الصفحة');
+    final thumbnail = info.youtubeId != null
+        ? VideoUtils.youtubeThumbnail(info.youtubeId!)
+        : null;
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.4),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.25),
-            blurRadius: 22,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: context.text2),
+                const SizedBox(width: 8),
+                Text(
+                  info.source == VideoSource.youtube
+                      ? 'فيديو يوتيوب جاهز'
+                      : info.source == VideoSource.directVideo
+                          ? 'رابط فيديو مباشر جاهز'
+                          : 'رابط الصفحة جاهز',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: context.text2,
+                  ),
                 ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      url,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: onDismiss,
-                color: AppColors.textMuted,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onUse,
-              icon: const Icon(Icons.play_circle_fill_rounded),
-              label: const Text('استخدام هذا الرابط في الغرفة'),
-              style: FilledButton.styleFrom(
-                backgroundColor: color,
-                minimumSize: const Size.fromHeight(44),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: thumbnail != null
+                    ? CachedNetworkImage(
+                        imageUrl: thumbnail,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) =>
+                            ColoredBox(color: context.variant),
+                        errorWidget: (_, _, _) => _thumbArt(context, icon),
+                      )
+                    : _thumbArt(context, icon),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Text(
+              title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.35,
+                fontWeight: FontWeight.w800,
+                color: context.text1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.link_rounded, size: 13, color: context.text3),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    info.url,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: context.text3),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            GradientButton(
+              label: 'استخدام هذا الفيديو',
+              icon: Icons.play_circle_fill_rounded,
+              onPressed: () => Navigator.pop(context, true),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('تجاهل والمتابعة في التصفح'),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _thumbArt(BuildContext context, IconData icon) {
+    return ColoredBox(
+      color: context.variant,
+      child: Icon(icon, size: 46, color: context.text3),
     );
   }
 }

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/media_capture.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/utils/video_utils.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -101,6 +102,49 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Future<void> _changeVideoDialog(RoomModel room) async {
+    final method = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.travel_explore_rounded),
+              title: const Text('فتح المتصفح والتقاط الفيديو'),
+              subtitle: const Text('شغّل الفيديو في أي موقع ثم اضغط الزر العائم'),
+              onTap: () => Navigator.pop(sheetCtx, 'browser'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.link_rounded),
+              title: const Text('إدخال رابط يدويًّا'),
+              subtitle: const Text('رابط يوتيوب أو رابط فيديو مباشر'),
+              onTap: () => Navigator.pop(sheetCtx, 'manual'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || method == null) return;
+
+    if (method == 'browser') {
+      final capture = await context.push<MediaCapture>('/browser');
+      if (capture != null) {
+        try {
+          await _repo.changeVideo(
+            widget.roomId,
+            capture.url,
+            videoTitle: capture.cleanTitle,
+          );
+          _snack('تم تحديث الفيديو ومزامنته مع جميع الحضور ✅');
+        } catch (_) {
+          _snack('تعذّر تغيير الفيديو');
+        }
+      }
+      return;
+    }
+
     final ctrl = TextEditingController(text: room.videoUrl);
     final formKey = GlobalKey<FormState>();
     final result = await showDialog<String>(
@@ -142,6 +186,7 @@ class _RoomPageState extends State<RoomPage> {
       _snack('تعذّر تغيير الفيديو');
     }
   }
+  // نهاية تغيير الفيديو
 
   Future<void> _closeRoomDialog(RoomModel room) async {
     final confirm = await showDialog<bool>(
@@ -157,7 +202,7 @@ class _RoomPageState extends State<RoomPage> {
             child: const Text('تراجع'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.live),
+            style: FilledButton.styleFrom(backgroundColor: context.mono),
             onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('إنهاء البث'),
           ),
@@ -220,7 +265,7 @@ class _RoomPageState extends State<RoomPage> {
         padding: const EdgeInsets.all(16),
         child: Text(
           'رابط الغرفة: ${room.videoUrl}',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: context.text2),
         ),
       );
     }
@@ -243,8 +288,8 @@ class _RoomPageState extends State<RoomPage> {
                   width: 8,
                   height: 8,
                   margin: const EdgeInsets.only(left: 8),
-                  decoration: const BoxDecoration(
-                    color: AppColors.live,
+                  decoration: BoxDecoration(
+                    color: context.mono,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -284,10 +329,9 @@ class _RoomPageState extends State<RoomPage> {
                     child: Row(
                       children: [
                         Icon(Icons.power_settings_new_rounded,
-                            size: 18, color: AppColors.live),
-                        SizedBox(width: 10),
-                        Text('إنهاء البث',
-                            style: TextStyle(color: AppColors.live)),
+                            size: 18, color: context.text2),
+                        const SizedBox(width: 10),
+                        Text('إنهاء البث'),
                       ],
                     ),
                   ),
@@ -295,10 +339,7 @@ class _RoomPageState extends State<RoomPage> {
               ),
           ],
           bottom: const TabBar(
-            indicatorColor: AppColors.primary,
             indicatorWeight: 3,
-            labelColor: AppColors.primaryLight,
-            unselectedLabelColor: AppColors.textMuted,
             tabs: [
               Tab(text: 'الدردشة', icon: Icon(Icons.chat_bubble_outline_rounded, size: 18)),
               Tab(text: 'الحضور', icon: Icon(Icons.groups_2_outlined, size: 18)),
@@ -335,17 +376,18 @@ class _RoomPageState extends State<RoomPage> {
 
   Widget _endedBanner() => Container(
         width: double.infinity,
-        color: AppColors.live.withValues(alpha: 0.15),
+        color: context.mono.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.videocam_off_rounded, size: 16, color: AppColors.live),
-            SizedBox(width: 8),
+            Icon(Icons.videocam_off_rounded,
+                size: 16, color: context.text2),
+            const SizedBox(width: 8),
             Text(
               'انتهى بث هذه الغرفة',
-              style:
-                  TextStyle(color: AppColors.live, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  color: context.text2, fontWeight: FontWeight.w800),
             ),
           ],
         ),
@@ -356,9 +398,9 @@ class _RoomPageState extends State<RoomPage> {
       margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.line),
       ),
       child: Row(
         children: [
@@ -379,30 +421,45 @@ class _RoomPageState extends State<RoomPage> {
                         room.hostName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
                           fontSize: 13.5,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.workspace_premium_rounded,
-                        size: 14, color: AppColors.warning),
+                    Icon(Icons.workspace_premium_rounded,
+                        size: 14, color: context.text2),
                   ],
                 ),
+                const SizedBox(height: 2),
                 Row(
                   children: [
                     Icon(
-                      isHost ? Icons.verified_rounded : Icons.sync_rounded,
+                      room.videoTitle != null
+                          ? Icons.smart_display_outlined
+                          : (isHost
+                              ? Icons.verified_rounded
+                              : Icons.sync_rounded),
                       size: 12,
-                      color: AppColors.success,
+                      color: context.text3,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      isHost ? 'أنت تتحكم بالمشاهدة للجميع' : 'تتم المزامنة مع المضيف',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.success,
+                    Expanded(
+                      child: Text(
+                        room.videoTitle != null &&
+                                room.videoTitle!.trim().isNotEmpty
+                            ? room.videoTitle!.trim()
+                            : (isHost
+                                ? 'أنت تتحكم بالمشاهدة للجميع'
+                                : 'تتم المزامنة مع المضيف'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.text3,
+                        ),
                       ),
                     ),
                   ],
@@ -479,13 +536,13 @@ class _CodeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return ActionChip(
       onPressed: onTap,
-      backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
-      avatar: const Icon(Icons.copy_rounded, size: 14, color: AppColors.primaryLight),
+      backgroundColor: context.variant,
+      side: BorderSide(color: context.line),
+      avatar: Icon(Icons.copy_rounded, size: 14, color: context.text1),
       label: Text(
         code,
-        style: const TextStyle(
-          color: AppColors.primaryLight,
+        style: TextStyle(
+          color: context.text1,
           fontWeight: FontWeight.w800,
           letterSpacing: 1.4,
         ),

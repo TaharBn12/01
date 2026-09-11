@@ -13,13 +13,13 @@ class AppLoader extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(
-            color: AppColors.primary,
+          CircularProgressIndicator(
+            color: context.mono,
             strokeWidth: 2.6,
           ),
           if (label != null) ...[
             const SizedBox(height: 14),
-            Text(label!, style: const TextStyle(color: AppColors.textMuted)),
+            Text(label!, style: TextStyle(color: context.text3)),
           ],
         ],
       ),
@@ -54,23 +54,18 @@ class EmptyState extends StatelessWidget {
               height: 110,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.18),
-                    AppColors.primary.withValues(alpha: 0.02),
-                  ],
-                ),
+                color: context.variant,
               ),
-              child: Icon(icon, size: 48, color: AppColors.primaryLight),
+              child: Icon(icon, size: 46, color: context.text2),
             ),
             const SizedBox(height: 22),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w900,
+                color: context.text1,
               ),
             ),
             if (message != null) ...[
@@ -78,8 +73,8 @@ class EmptyState extends StatelessWidget {
               Text(
                 message!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
+                style: TextStyle(
+                  color: context.text3,
                   height: 1.7,
                 ),
               ),
@@ -109,13 +104,12 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 52, color: AppColors.live),
+            Icon(Icons.error_outline_rounded, size: 52, color: context.mono),
             const SizedBox(height: 14),
             Text(
               _friendlyError(error),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary, height: 1.7),
+              style: TextStyle(color: context.text2, height: 1.7),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 18),

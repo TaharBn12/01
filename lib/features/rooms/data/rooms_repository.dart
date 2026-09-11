@@ -2,6 +2,7 @@ import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/realtime_clock.dart';
+import '../../../core/utils/remote_title.dart';
 import '../../../core/utils/video_utils.dart';
 import '../../auth/data/app_user.dart';
 import 'message_model.dart';
@@ -75,8 +76,16 @@ class RoomsRepository {
     required String name,
     required String rawVideoUrl,
     required AppUser host,
+    String? videoTitle,
   }) async {
     final video = VideoUtils.inspect(rawVideoUrl);
+
+    // عنوان الفيديو: المُلتقَط من المتصفح، وإلا خدمة oEmbed ليوتيوب
+    var title = videoTitle?.trim();
+    if ((title == null || title.isEmpty) && video.youtubeId != null) {
+      title = await fetchYouTubeTitle(video.youtubeId!);
+    }
+
     final now = DateTime.now().millisecondsSinceEpoch;
 
     String? code;
@@ -96,6 +105,7 @@ class RoomsRepository {
       id: code,
       name: name.trim(),
       videoUrl: video.url,
+      videoTitle: title,
       source: video.source,
       youtubeId: video.youtubeId,
       thumbnailUrl: video.thumbnailUrl,
@@ -116,6 +126,7 @@ class RoomsRepository {
     await _room(code).set({
       'name': room.name,
       'videoUrl': room.videoUrl,
+      'videoTitle': room.videoTitle,
       'source': room.source.name,
       'youtubeId': room.youtubeId,
       'thumbnailUrl': room.thumbnailUrl,
@@ -140,10 +151,19 @@ class RoomsRepository {
     return room;
   }
 
-  Future<void> changeVideo(String roomId, String rawVideoUrl) async {
+  Future<void> changeVideo(
+    String roomId,
+    String rawVideoUrl, {
+    String? videoTitle,
+  }) async {
     final video = VideoUtils.inspect(rawVideoUrl);
+    var title = videoTitle?.trim();
+    if ((title == null || title.isEmpty) && video.youtubeId != null) {
+      title = await fetchYouTubeTitle(video.youtubeId!);
+    }
     await _room(roomId).update({
       'videoUrl': video.url,
+      'videoTitle': title,
       'source': video.source.name,
       'youtubeId': video.youtubeId,
       'thumbnailUrl': video.thumbnailUrl,
@@ -165,6 +185,24 @@ class RoomsRepository {
   Stream<List<AppUser>> watchParticipants(String roomId) {
     return _room(roomId)
         .child(AppConstants.participantsSub)
+        .onValue
+        .map((event) {
+      final value = event.snapshot.value as Map?;
+      if (value == null) return <AppUser>[];
+      return value.entries
+          .map((entry) => AppUser.fromMap(
+                Map<dynamic, dynamic>.from(entry.value as Map),
+                entry.key,
+              ))
+          .toList();
+    });
+  }
+
+  /// عدد محدود من أوجه الحضور (لأكوام الصور في بطاقات الغرف)
+  Stream<List<AppUser>> watchAttendees(String roomId, {int limit = 4}) {
+    return _room(roomId)
+        .child(AppConstants.participantsSub)
+        .limitToFirst(limit)
         .onValue
         .map((event) {
       final value = event.snapshot.value as Map?;

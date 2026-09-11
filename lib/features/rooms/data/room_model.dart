@@ -45,6 +45,7 @@ class RoomModel {
     required this.hostName,
     required this.hostPhotoUrl,
     required this.createdAtMs,
+    this.videoTitle,
     this.thumbnailUrl,
     this.youtubeId,
     this.participantCount = 0,
@@ -55,6 +56,7 @@ class RoomModel {
   final String id;
   final String name;
   final String videoUrl;
+  final String? videoTitle;
   final VideoSource source;
   final String hostUid;
   final String hostName;
@@ -65,6 +67,12 @@ class RoomModel {
   final bool isLive;
   final int? createdAtMs;
   final PlaybackState? playback;
+
+  /// العنوان المعروض للفيديو: العنوان الملتقَط أو اسم الغرفة
+  String get displayTitle =>
+      (videoTitle != null && videoTitle!.trim().isNotEmpty)
+          ? videoTitle!.trim()
+          : name;
 
   DateTime? get createdAt => createdAtMs == null
       ? null
@@ -87,6 +95,7 @@ class RoomModel {
       id: id,
       name: (data['name'] ?? 'غرفة بلا اسم') as String,
       videoUrl: (data['videoUrl'] ?? '') as String,
+      videoTitle: data['videoTitle'] as String?,
       source: source,
       hostUid: (data['hostUid'] ?? '') as String,
       hostName: (data['hostName'] ?? 'المضيف') as String,

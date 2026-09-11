@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/media_capture.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/utils/video_utils.dart';
 import '../../../core/widgets/app_text_field.dart';
@@ -25,6 +26,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
   final _nameCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   VideoInfo? _video;
+  String? _capturedTitle;
   bool _creating = false;
 
   @override
@@ -45,7 +47,11 @@ class _AddRoomPageState extends State<AddRoomPage> {
     final text = _urlCtrl.text.trim();
     final info = text.isEmpty ? null : VideoUtils.inspect(text);
     if (info?.source != _video?.source || info?.url != _video?.url) {
-      setState(() => _video = info);
+      setState(() {
+        _video = info;
+        // اللصق اليدوي يُلغي العنوان الملتقَط من المتصفح
+        if (_capturedTitle != null) _capturedTitle = null;
+      });
     }
   }
 
@@ -54,12 +60,18 @@ class _AddRoomPageState extends State<AddRoomPage> {
       _snack('المتصفح الداخلي متاح على تطبيق الجوال، الصق الرابط مباشرة.');
       return;
     }
-    final result = await context.push<String>(
+    final result = await context.push<MediaCapture>(
       '/browser${url != null ? '?url=${Uri.encodeComponent(url)}' : ''}',
     );
-    if (result != null && result.isNotEmpty) {
-      _urlCtrl.text = result;
+    if (result != null && result.url.isNotEmpty) {
+      _urlCtrl.text = result.url;
+      setState(() => _capturedTitle = MediaCapture.normalizeTitle(result.title));
       _refresh();
+      if ((_nameCtrl.text.trim().isEmpty) &&
+          _capturedTitle != null &&
+          VideoUtils.inspect(result.url).source != VideoSource.webPage) {
+        _nameCtrl.text = _capturedTitle!;
+      }
     }
   }
 
@@ -76,6 +88,7 @@ class _AddRoomPageState extends State<AddRoomPage> {
             name: _nameCtrl.text,
             rawVideoUrl: _urlCtrl.text,
             host: AppUser.fromFirebase(user),
+            videoTitle: _capturedTitle,
           );
       if (mounted) context.pushReplacement('/room/${room.id}');
     } on RoomsFailure catch (e) {
@@ -110,48 +123,48 @@ class _AddRoomPageState extends State<AddRoomPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const _Intro(),
-                      const SizedBox(height: 24),
-                      const _Label('اسم الغرفة'),
+                      const SizedBox(height: 28),
+                      _Label('اسم الغرفة'),
                       const SizedBox(height: 8),
                       AppTextField(
                         controller: _nameCtrl,
-                        hint: 'مثال: سهرة فيلم الجمعة 🍿',
+                        hint: 'مثال: سهرة فيلم الجمعة',
                         prefixIcon: Icons.movie_filter_rounded,
                         validator: Validators.roomName,
                         textInputAction: TextInputAction.next,
                       ),
-                      const SizedBox(height: 22),
-                      const _Label('رابط المشاهدة'),
+                      const SizedBox(height: 24),
+                      _Label('رابط المشاهدة'),
                       const SizedBox(height: 8),
                       AppTextField(
                         controller: _urlCtrl,
-                        hint: 'رابط يوتيوب أو رابط فيديو مباشر (mp4 / m3u8)',
+                        hint: 'يوتيوب أو رابط مباشر (mp4 / m3u8)',
                         prefixIcon: Icons.link_rounded,
                         keyboardType: TextInputType.url,
                         validator: Validators.videoUrl,
                         suffix: IconButton(
                           tooltip: 'التقاط من المتصفح',
-                          icon: const Icon(Icons.travel_explore_rounded,
-                              color: AppColors.primaryLight),
+                          icon: Icon(Icons.travel_explore_rounded,
+                              color: context.text1),
                           onPressed: () => _openBrowser(null),
                         ),
                       ),
                       const SizedBox(height: 10),
-                      _DetectionPill(video: _video),
-                      const SizedBox(height: 22),
-                      const _Label('تصفّح موقعًا لالتقاط الفيديو'),
+                      _DetectionPill(
+                        video: _video,
+                        capturedTitle: _capturedTitle,
+                      ),
+                      const SizedBox(height: 26),
+                      _Label('أو تصفّح موقعًا والتقط الفيديو أثناء تشغيله'),
                       const SizedBox(height: 10),
                       _QuickSitesRow(onSelect: _openBrowser),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: TextButton.icon(
                           onPressed: () => _openBrowser(null),
                           icon: const Icon(Icons.language_rounded, size: 19),
                           label: const Text('فتح المتصفح الداخلي'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primaryLight,
-                          ),
                         ),
                       ),
                     ],
@@ -166,11 +179,9 @@ class _AddRoomPageState extends State<AddRoomPage> {
                 20,
                 12 + MediaQuery.of(context).viewPadding.bottom,
               ),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                border: Border(
-                  top: BorderSide(color: AppColors.border),
-                ),
+              decoration: BoxDecoration(
+                color: context.cardColor,
+                border: Border(top: BorderSide(color: context.line)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -182,10 +193,9 @@ class _AddRoomPageState extends State<AddRoomPage> {
                     onPressed: _create,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'تحصل على كود دعوة قصير تشاركه مع أصدقائك',
-                    style:
-                        TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: TextStyle(color: context.text3, fontSize: 12),
                   ),
                 ],
               ),
@@ -208,13 +218,13 @@ class _Intro extends StatelessWidget {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            gradient: AppGradients.primary,
+            color: context.mono,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(Icons.add_rounded, color: Colors.white),
+          child: Icon(Icons.add_rounded, color: context.onMono),
         ),
         const SizedBox(width: 14),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -222,13 +232,13 @@ class _Intro extends StatelessWidget {
                 'سهرة جديدة',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  color: context.text1,
                 ),
               ),
               Text(
-                'أدخل تفاصيل الغرفة وادعُ أصدقاءك للمشاهدة معًا',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                'أدخل التفاصيل وادعُ أصدقاءك للمشاهدة معًا',
+                style: TextStyle(color: context.text3, fontSize: 12.5),
               ),
             ],
           ),
@@ -246,80 +256,100 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 13.5,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textSecondary,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        color: context.text2,
       ),
     );
   }
 }
 
 class _DetectionPill extends StatelessWidget {
-  const _DetectionPill({required this.video});
+  const _DetectionPill({required this.video, this.capturedTitle});
+
   final VideoInfo? video;
+  final String? capturedTitle;
 
   @override
   Widget build(BuildContext context) {
     final source = video?.source;
     if (video == null || source == null || source == VideoSource.unknown) {
-      return _hint(
-        Icons.help_outline_rounded,
-        'الصق رابطًا ليتم تحديد نوعه تلقائيًّا',
-        AppColors.textMuted,
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: context.variant,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.help_outline_rounded, size: 17, color: context.text3),
+            const SizedBox(width: 8),
+            Text(
+              'الصق رابطًا ليُحدَّد نوعه تلقائيًّا',
+              style: TextStyle(color: context.text3, fontSize: 12.5),
+            ),
+          ],
+        ),
       );
     }
-    final (color, icon) = switch (source) {
-      VideoSource.youtube => (AppColors.youtube, Icons.smart_display_rounded),
-      VideoSource.directVideo =>
-        (AppColors.success, Icons.movie_filter_rounded),
-      VideoSource.webPage => (AppColors.warning, Icons.language_rounded),
-      VideoSource.unknown => (AppColors.textMuted, Icons.help_outline_rounded),
+
+    final icon = switch (source) {
+      VideoSource.youtube => Icons.smart_display_rounded,
+      VideoSource.directVideo => Icons.movie_filter_rounded,
+      VideoSource.webPage => Icons.language_rounded,
+      VideoSource.unknown => Icons.help_outline_rounded,
     };
+    final ready = source.playable;
+    final color = ready ? context.mono : context.text2;
+    final bg = ready ? context.mono.withValues(alpha: 0.08) : context.variant;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: ready
+              ? context.mono.withValues(alpha: 0.35)
+              : context.line,
+        ),
       ),
       child: Row(
         children: [
           Icon(icon, size: 17, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              source.playable
-                  ? '${source.label} — جاهز للتشغيل داخل الغرفة'
-                  : '${source.label} — سيُعرض داخل متصفح الغرفة',
-              style: TextStyle(
-                color: color,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  ready
+                      ? '${source.label} — جاهز للتشغيل داخل الغرفة'
+                      : '${source.label} — يُعرض داخل متصفح الغرفة',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (capturedTitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'العنوان الملتقَط: $capturedTitle',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: context.text3),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _hint(IconData icon, String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 17, color: color),
-            const SizedBox(width: 8),
-            Text(text,
-                style: const TextStyle(
-                    color: AppColors.textMuted, fontSize: 12.5)),
-          ],
-        ),
-      );
 }
 
 class _QuickSitesRow extends StatelessWidget {
@@ -329,7 +359,7 @@ class _QuickSitesRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: QuickSite.all.length,
@@ -337,25 +367,25 @@ class _QuickSitesRow extends StatelessWidget {
         itemBuilder: (context, i) {
           final site = QuickSite.all[i];
           return InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(21),
             onTap: () => onSelect(site.url),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 13),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
+                color: context.variant,
+                borderRadius: BorderRadius.circular(21),
+                border: Border.all(color: context.line),
               ),
               child: Row(
                 children: [
-                  Icon(site.icon, size: 17, color: site.color),
+                  Icon(site.icon, size: 16, color: context.text2),
                   const SizedBox(width: 6),
                   Text(
                     site.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      color: context.text2,
                     ),
                   ),
                 ],
