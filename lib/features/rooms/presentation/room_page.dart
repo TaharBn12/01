@@ -313,8 +313,8 @@ class _RoomPageState extends State<RoomPage> {
                   if (value == 'change') _changeVideoDialog(room);
                   if (value == 'close') _closeRoomDialog(room);
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
                     value: 'change',
                     child: Row(
                       children: [
@@ -331,7 +331,7 @@ class _RoomPageState extends State<RoomPage> {
                         Icon(Icons.power_settings_new_rounded,
                             size: 18, color: context.text2),
                         const SizedBox(width: 10),
-                        Text('إنهاء البث'),
+                        const Text('إنهاء البث'),
                       ],
                     ),
                   ),
