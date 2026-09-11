@@ -78,7 +78,7 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   void _onLocalPlayback(bool isPlaying, double positionSeconds) {
-    // يرفع المضيف حالة التشغيل إلى Firestore لتتم مزامنة الضيوف
+    // يرفع المضيف حالة التشغيل إلى Realtime Database لتتم مزامنة الضيوف
     unawaited(
       _repo.updatePlayback(
         roomId: widget.roomId,

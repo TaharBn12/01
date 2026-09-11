@@ -8,7 +8,7 @@ class AppConstants {
   static const String appTagline = 'شاهدوا معًا في نفس اللحظة';
   static const String appVersion = '1.0.0';
 
-  /// مجموعات Firestore
+  /// مسارات Realtime Database
   static const String usersCollection = 'users';
   static const String roomsCollection = 'rooms';
   static const String participantsSub = 'participants';

@@ -88,7 +88,7 @@ class _ChatPanelState extends State<ChatPanel> {
                   message: 'كن أول من يتفاعل مع الحضور! 👋',
                 );
               }
-              // الرسائل تصل من Firestore مرتبة من الأحدث للأقدم،
+              // الرسائل تصل من Realtime Database مرتبة من الأحدث للأقدم،
               // وقائمة العرض معكوسة ليظهر الأحدث في الأسفل.
               return ListView.builder(
                 controller: _scrollCtrl,
